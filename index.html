@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>川端橋 1937–2026</title>
+<meta name="description" content="以捲動動畫重述新店溪上的川端橋（中正橋）：從渡船時代、1937年開通、戰後拓寬、危橋與文資保存，到新中正橋鋼拱與2026年9月21日川端橋修復啟用。">
+<meta property="og:title" content="川端橋 1937–2026｜新店溪上的八十九年">
+<meta property="og:description" content="從網溪渡到川端橋、中正橋，再到2026年9月修復啟用的人行橋——一座橋的完整歷史動畫。">
+<meta name="theme-color" content="#070b16">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070b16;
+  --bg2:#0d1426;
+  --panel:rgba(9,14,28,.80);
+  --panel-solid:#0f172b;
+  --ink:#ece6d8;
+  --ink-soft:#c5c9d3;
+  --muted:#8f97a8;
+  --line:rgba(236,230,216,.14);
+  --gold:#e8b04b;
+  --gold-soft:rgba(232,176,75,.18);
+  --steel:#8fb3cf;
+  --river:#3f7fa6;
+  --red:#ff5b4f;
+  --serif:"Noto Serif TC","Songti TC","PMingLiU",serif;
+  --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.75;overflow-x:hidden}
+a{color:var(--gold)}
+h1,h2,h3{font-family:var(--serif);font-weight:900;letter-spacing:.02em;line-height:1.25}
+.progress{position:fixed;inset:0 0 auto 0;height:3px;z-index:50;background:transparent}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--gold),#f5d68f)}
+
+/* ---------- scrollytelling ---------- */
+.scrolly{position:relative}
+.stage{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;background:#0b1224}
+.stage svg{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:visible}
+.hud{position:absolute;top:22px;right:28px;text-align:right;pointer-events:none;z-index:3;text-shadow:0 2px 18px rgba(0,0,0,.55)}
+.hud-era{font-size:14px;letter-spacing:.25em;color:var(--gold);font-weight:700}
+.hud-year{font-family:var(--serif);font-weight:900;font-size:clamp(44px,7.2vw,104px);line-height:1;color:#fff;font-variant-numeric:tabular-nums}
+.hud-view{margin-top:8px;font-size:12px;color:rgba(255,255,255,.72);letter-spacing:.05em}
+
+.steps{position:relative;z-index:4;margin-top:-100vh;margin-top:-100svh;pointer-events:none}
+.steps .card{pointer-events:auto}
+.step{min-height:100vh;min-height:100svh;display:flex;align-items:center;padding:12vh 4vw}
+.step:last-child{min-height:120vh}
+.card{max-width:430px;background:var(--panel);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:16px;padding:24px 26px 22px;box-shadow:0 20px 60px rgba(0,0,0,.35);opacity:.35;transform:translateY(24px);transition:opacity .6s,transform .6s}
+.step.is-active .card{opacity:1;transform:none}
+.kicker{font-size:12.5px;letter-spacing:.28em;color:var(--gold);font-weight:700;margin:0 0 6px}
+.card h2{font-size:clamp(22px,2.4vw,30px);margin:0 0 12px}
+.card p{margin:0 0 12px;color:var(--ink-soft);font-size:15.5px}
+.card p:last-child{margin-bottom:0}
+.card strong{color:var(--ink)}
+.note{font-size:13px!important;color:var(--muted)!important;border-left:2px solid var(--gold-soft);padding-left:10px}
+.legend-tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;border:1px solid var(--gold);color:var(--gold);margin-right:6px;vertical-align:2px}
+.hero .card{max-width:560px}
+.hero h1{font-size:clamp(56px,9vw,120px);margin:0;line-height:1;letter-spacing:.06em}
+.hero .dates{font-family:var(--serif);font-size:clamp(20px,2.6vw,30px);color:var(--gold);margin:6px 0 16px;letter-spacing:.12em}
+.scroll-hint{display:flex;align-items:center;gap:10px;margin-top:18px;font-size:13px;color:var(--muted);letter-spacing:.15em}
+.scroll-hint i{width:18px;height:28px;border:1.5px solid var(--muted);border-radius:10px;position:relative}
+.scroll-hint i:after{content:"";position:absolute;left:50%;top:5px;width:3px;height:6px;margin-left:-1.5px;border-radius:2px;background:var(--gold);animation:hint 1.6s infinite}
+@keyframes hint{0%{transform:translateY(0);opacity:1}100%{transform:translateY(10px);opacity:0}}
+
+.mini{display:block;width:100%;height:auto;margin:6px 0 14px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 14px}
+.stats div{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.stats b{display:block;font-family:var(--serif);font-size:20px;color:#fff;line-height:1.2}
+.stats span{font-size:12px;color:var(--muted)}
+.phases{list-style:none;margin:0 0 12px;padding:0}
+.phases li{display:grid;grid-template-columns:92px 1fr;gap:10px;font-size:14.5px;color:var(--ink-soft);padding:6px 0;border-bottom:1px dashed var(--line);opacity:0;transform:translateX(-8px);transition:.5s}
+.step.is-active .phases li{opacity:1;transform:none}
+.phases li:nth-child(2){transition-delay:.15s}.phases li:nth-child(3){transition-delay:.3s}.phases li:nth-child(4){transition-delay:.45s}.phases li:nth-child(5){transition-delay:.6s}
+.phases time{font-family:var(--serif);color:var(--gold);font-weight:700}
+
+/* name plaque flip */
+.plaque-wrap{perspective:700px;display:flex;justify-content:center;margin:4px 0 16px}
+.plaque{width:92px;height:190px;position:relative;transform-style:preserve-3d;transition:transform 1.4s cubic-bezier(.5,0,.2,1) .5s}
+.step.is-active .plaque{transform:rotateY(180deg)}
+.plaque div{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:6px;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;font-family:var(--serif);font-size:34px;font-weight:900;letter-spacing:.3em;color:#2a2620;background:linear-gradient(135deg,#d9d1bf,#b9b09c);box-shadow:inset 0 0 0 3px rgba(0,0,0,.12),0 10px 30px rgba(0,0,0,.4)}
+.plaque .back{transform:rotateY(180deg);background:linear-gradient(135deg,#cfd3d6,#a8adb1)}
+
+/* ---------- 3D stage ---------- */
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
+#labels{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;transition:opacity .5s;white-space:nowrap;font-size:12px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.9);will-change:transform}
+.lbl b{display:block;font-family:var(--serif);font-size:16px;letter-spacing:.12em;transform:translate(-50%,-100%);position:absolute;left:0;bottom:4px;padding-bottom:6px}
+.lbl span{position:absolute;left:0;top:-4px;transform:translate(-50%,0);color:rgba(255,255,255,.75);font-size:11.5px;letter-spacing:.05em}
+.lbl:before{content:"";position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px rgba(232,176,75,.9)}
+.lbl.warn b{color:#ff8a7e}.lbl.warn:before{background:#ff5b4f;box-shadow:0 0 10px #ff5b4f}
+.explore{all:unset;z-index:5;position:absolute;right:26px;bottom:22px;cursor:pointer;font-size:13px;letter-spacing:.1em;padding:8px 16px;border-radius:99px;background:rgba(10,16,32,.72);border:1px solid var(--line);color:var(--ink);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.explore:hover{border-color:var(--gold)}
+.explore:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:12px;background:#0b1224;color:var(--ink-soft);font-size:14px;letter-spacing:.1em;z-index:6;transition:opacity .8s}
+.loading.done{opacity:0;pointer-events:none}
+.loading i{width:18px;height:18px;border-radius:50%;border:2px solid var(--gold);border-right-color:transparent;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+body.exploring{overflow:hidden}
+body.exploring .stage{position:fixed;inset:0;z-index:40;height:100vh;height:100svh}
+body.exploring .steps,body.exploring .dots,body.exploring .hud{visibility:hidden}
+body.exploring #gl{touch-action:none}
+body.no-webgl .stage{background:linear-gradient(#1b2745,#0b1224)}
+
+/* mini svgs */
+.draw{stroke-dasharray:900;stroke-dashoffset:900}
+.step.is-active .draw{animation:drawin 2.4s ease forwards}
+.step.is-active .fillin{animation:fillin 1s ease forwards 1.6s}
+.fillin{fill-opacity:0}
+@keyframes drawin{to{stroke-dashoffset:0}}
+@keyframes fillin{to{fill-opacity:1}}
+.bar{transform-box:fill-box;transform-origin:50% 50%;transform:scaleX(0);transition:transform 1.1s cubic-bezier(.2,.8,.2,1)}
+.step.is-active .bar{transform:none}
+.bar.d1{transition-delay:.3s}.bar.d2{transition-delay:1.1s}.bar.d3{transition-delay:1.9s}
+.fade-late{opacity:0;transition:opacity .8s 2.4s}
+.step.is-active .fade-late{opacity:1}
+.rs-wide{transition:opacity 1s .6s}
+.step.is-active .rs-wide{opacity:.12}
+.rs-core{transition:transform 1.4s cubic-bezier(.45,0,.2,1) 1.6s}
+.step.is-active .rs-core{transform:translateY(-18px)}
+
+/* chapter dots */
+.dots{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:30;display:flex;flex-direction:column;gap:9px}
+.dots button{all:unset;cursor:pointer;width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.28);position:relative;transition:.3s}
+.dots button.on{background:var(--gold);transform:scale(1.35)}
+.dots button span{position:absolute;right:18px;top:50%;transform:translateY(-50%);white-space:nowrap;font-size:12px;background:var(--panel-solid);border:1px solid var(--line);padding:2px 8px;border-radius:6px;opacity:0;pointer-events:none;transition:.2s}
+.dots button:hover span,.dots button:focus-visible span{opacity:1}
+.dots button:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+
+/* ---------- sections ---------- */
+section.block{padding:110px 6vw;position:relative}
+.block-head{max-width:880px;margin:0 auto 34px}
+.block-head .kicker{margin-bottom:10px}
+.block-head h2{font-size:clamp(28px,3.6vw,44px);margin:0 0 10px}
+.block-head p{color:var(--ink-soft);margin:0}
+#map{background:linear-gradient(180deg,var(--bg),var(--bg2))}
+.map-wrap{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:22px;align-items:start}
+.map-box{position:relative;background:#0a1122;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.map-box svg{display:block;width:100%;height:auto}
+.map-tools{position:absolute;top:12px;left:12px;display:flex;gap:6px;z-index:2}
+.seg{all:unset;cursor:pointer;font-size:13.5px;padding:6px 14px;border-radius:99px;background:rgba(10,16,32,.85);border:1px solid var(--line);color:var(--ink-soft)}
+.seg[aria-pressed="true"]{background:var(--gold);color:#1b1407;border-color:var(--gold);font-weight:700}
+.seg:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.map-info{background:var(--panel-solid);border:1px solid var(--line);border-radius:16px;padding:20px 22px;position:sticky;top:20px}
+.map-info h3{margin:0 0 4px;font-size:22px}
+.map-info .meta{font-size:12.5px;color:var(--gold);letter-spacing:.12em;margin-bottom:10px}
+.map-info p{margin:0 0 10px;color:var(--ink-soft);font-size:14.5px}
+.map-legend{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.map-legend span{display:inline-flex;align-items:center;gap:6px}
+.map-legend i{display:inline-block;width:14px;height:4px;border-radius:2px}
+#mapSvg .pin{cursor:pointer}
+#mapSvg .pin:focus{outline:none}
+#mapSvg .pin:focus-visible circle.dot,#mapSvg .pin.sel circle.dot{stroke:#fff;stroke-width:3}
+#mapSvg .pin .halo{transform-box:fill-box;transform-origin:center;animation:pulse 2.4s ease-out infinite}
+#mapSvg .era1930,#mapSvg .eranow{transition:opacity .8s}
+#mapSvg[data-era="now"] .era1930{opacity:0;pointer-events:none}
+#mapSvg[data-era="1930"] .eranow{opacity:0;pointer-events:none}
+#riverFlow{animation:flow 3s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-44}}
+#corridor{animation:flow 2s linear infinite}
+#ferryLine{animation:flow 2.4s linear infinite}
+
+#numbers{background:var(--bg2)}
+.num-grid{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.num{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:18px 18px 14px}
+.num b{display:block;font-family:var(--serif);font-size:clamp(28px,3.2vw,40px);color:#fff;line-height:1.1;font-variant-numeric:tabular-nums}
+.num b small{font-size:.5em;color:var(--gold);margin-left:4px}
+.num span{font-size:13px;color:var(--muted)}
+.num.old b{color:#f3d08a}
+
+#timeline{background:linear-gradient(180deg,var(--bg2),var(--bg))}
+.tl{max-width:880px;margin:0 auto;position:relative;padding-left:28px}
+.tl:before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:2px;background:linear-gradient(var(--gold),var(--steel))}
+.tl-era{font-family:var(--serif);font-size:20px;font-weight:900;margin:34px 0 10px;color:var(--gold)}
+.tl-era:first-child{margin-top:0}
+.tl-item{position:relative;display:grid;grid-template-columns:120px 1fr;gap:14px;padding:9px 0;border-bottom:1px dashed var(--line);opacity:0;transform:translateY(12px);transition:.6s}
+.tl-item.seen{opacity:1;transform:none}
+.tl-item:before{content:"";position:absolute;left:-26px;top:17px;width:10px;height:10px;border-radius:50%;background:var(--bg);border:2px solid var(--gold)}
+.tl-item time{font-family:var(--serif);font-weight:700;color:#fff;font-size:15px}
+.tl-item p{margin:0;color:var(--ink-soft);font-size:15px}
+.tl-item.key:before{background:var(--gold)}
+.tl-item.key time{color:var(--gold)}
+
+#sources{background:var(--bg);padding-top:70px}
+.src{max-width:880px;margin:0 auto;columns:2;column-gap:36px;font-size:14px}
+.src li{margin:0 0 8px;break-inside:avoid;color:var(--muted)}
+.src a{color:var(--ink-soft);text-decoration-color:rgba(232,176,75,.5)}
+.caveat{max-width:880px;margin:26px auto 0;font-size:13.5px;color:var(--muted);border:1px solid var(--line);border-radius:12px;padding:14px 18px}
+footer{text-align:center;padding:40px 6vw 60px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
+
+@media (max-width:900px){
+  .map-wrap{grid-template-columns:1fr}
+  .map-info{position:static}
+  .num-grid{grid-template-columns:repeat(2,1fr)}
+  .src{columns:1}
+}
+@media (max-width:760px){
+  .hud{top:14px;left:16px;right:auto;text-align:left}
+  .hud-year{font-size:44px}
+  .hud-view{display:none}
+      .step{align-items:flex-end;padding:0 12px 5vh}
+  .step .card{margin-top:58vh}
+  .card{max-width:none;width:100%;padding:18px 18px 16px}
+  .card p{font-size:14.5px}
+  .hero .card{margin-top:40vh}
+  .dots{display:none}
+  .explore{top:14px;right:14px;bottom:auto;font-size:12px;padding:6px 12px}
+  .tl-item{grid-template-columns:1fr;gap:2px}
+  section.block{padding:80px 16px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important;transition-delay:0s!important;scroll-behavior:auto!important}
+}
+</style>
+</head>
+<body>
+<div class="progress" aria-hidden="true"><i id="prog"></i></div>
+<nav class="dots" id="dots" aria-label="章節導覽"></nav>
+
+<section class="scrolly" id="story" aria-label="川端橋歷史捲動動畫">
+  <div class="stage">
+    <canvas id="gl" aria-label="川端橋與新中正橋的3D場景" role="img"></canvas>
+    <div id="labels" aria-hidden="true"></div>
+    <div class="hud" aria-hidden="true"><div class="hud-era" id="hudEra">修復啟用</div><div class="hud-year" id="hudYear">2026</div><div class="hud-view">3D 重建・依史料尺寸建模</div></div>
+    <button type="button" class="explore" id="exploreBtn" aria-pressed="false">自由探索 3D</button>
+    <div class="loading" id="loading"><i></i>正在建構新店溪與川端橋的3D場景…</div>
+  </div>
+
+  <div class="steps" id="steps">
+
+    <article class="step hero" data-scene="reopen" data-year="2026" data-era="修復啟用" data-l="永和" data-r="臺北・中正區" data-title="序">
+      <div class="card">
+        <p class="kicker">新店溪上的八十九年</p>
+        <h1>川端橋</h1>
+        <div class="dates">1937 — 2026</div>
+        <p>2026年9月21日傍晚，這座日治時期的老橋卸下半世紀的拓寬外衣、整體抬升之後，以<strong>人行與自行車橋</strong>之姿重新開放。拱墩下的投射燈亮起，光影映上一旁新中正橋的薄荷色鋼拱——新橋如琴、舊橋如瑟。</p>
+        <p>這是一座橋，也是永和與臺北一起長大的故事。</p>
+        <div class="scroll-hint"><i></i>往下捲動，回到一百年前</div>
+      </div>
+    </article>
+
+    <article class="step" data-scene="ferry" data-year="1920" data-yeartext="1920s" data-era="渡船時代" data-l="溪洲（中和庄）" data-r="臺北城南" data-title="渡船時代">
+      <div class="card">
+        <p class="kicker">第一章｜渡船時代</p>
+        <h2>一水之隔：溪洲與網溪渡</h2>
+        <p>新店溪自山區北流，在今天的永和繞出一個大彎。彎內這片沖積沙洲古稱<strong>「溪洲」</strong>，日治時期屬臺北州海山郡<strong>中和庄</strong>。</p>
+        <p>要到對岸的臺北城南，只能搭渡船。兩岸渡口中以<strong>「網溪渡」</strong>最大（約在今永和光復街底）。入夜月映江心，「<strong>網溪泛月</strong>」名列中和八景——但渡河費時，遇上大水更是危險。</p>
+        <p class="note">3D 場景的河道依 OpenStreetMap 的新店溪中心線建模；遠方的觀音山、大屯山依實際方位擺放。可按右下角「自由探索 3D」自行轉動視角。</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="kawabata" data-year="1922" data-yeartext="1917–1930s" data-era="川端町" data-l="溪洲（中和庄）" data-r="臺北市川端町" data-title="川端町">
+      <div class="card">
+        <p class="kicker">第二章｜對岸的水岸町</p>
+        <h2>川端町：臺北城南的河畔名所</h2>
+        <p>對岸這一帶在1922年町名改正時命名為<strong>「川端町」</strong>——「川端」就是日文的「河畔」。這裡是日治時期臺北近郊的遊憩地：料亭沿河而設，夏夜乘<strong>屋形船</strong>納涼賞月，品嚐新店溪的香魚。</p>
+        <p>1917年，料亭<strong>「紀州庵」</strong>在此開設支店，經營的平松家擁有三、四艘屋形船，每艘可乘三十人。附近「螢橋」一帶，也因夏夜的螢火留下了地名。</p>
+        <p>日後跨越新店溪的那座橋，就是以這個町為名。</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="petition" data-year="1932" data-yeartext="1919–1932" data-era="建橋請願" data-l="溪洲・網溪別墅" data-r="臺北市川端町" data-title="建橋請願">
+      <div class="card">
+        <p class="kicker">第三章｜誰讓橋出現？</p>
+        <h2>網溪別墅的菊花與建橋請願</h2>
+        <p>1919年，士紳<strong>楊仲佐</strong>（畫家楊三郎之父）在溪洲網尾寮建「<strong>網溪別墅</strong>」，植菊千餘株，曾創下單日五千人前來賞菊的紀錄，總督府與臺北州官員也常是座上客。</p>
+        <p><span class="legend-tag">傳說</span>地方流傳1923年裕仁皇太子曾來此賞菊，親嚐渡河之苦後下令建橋——但當年報紙逐日刊載的行程並無此行，研究者認為多半是個「美麗的誤會」。</p>
+        <p>真正推動建橋的是地方自己：<strong>1932年</strong>，中和庄民組成請願團，由楊仲佐率領向海山郡守陳情。</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="piers" data-year="1935" data-era="動工" data-l="中和庄" data-r="臺北市川端町" data-title="拱墩">
+      <div class="card">
+        <p class="kicker">第四章｜1935 動工</p>
+        <h2>十三座雙柱式拱型橋墩</h2>
+        <p>設計出自<strong>臺北州土木課</strong>。1935年3月辦理現場說明與競標，<strong>6月1日動工</strong>。河床上先打下鋼筋混凝土聯合基腳，再立起13座<strong>「雙柱式拱型鏤空橋墩」</strong>——兩根柱子在頂端以圓拱相連、中間鏤空，這是川端橋最具辨識度的輪廓。</p>
+        <svg class="mini" viewBox="0 0 300 180" role="img" aria-label="雙柱式拱型橋墩正面示意圖">
+          <rect x="0" y="126" width="300" height="54" fill="#23405a" opacity=".6"/>
+          <path class="draw fillin" d="M60,50 H240 V156 H196 V98 A46 46 0 0 0 104 98 V156 H60 Z" fill="#cfc6b4" stroke="#f0e6cf" stroke-width="2"/>
+          <rect class="draw fillin" x="48" y="156" width="204" height="12" fill="#9d9584" stroke="#f0e6cf" stroke-width="1.5"/>
+          <rect class="fade-late" x="78" y="34" width="10" height="16" fill="#5a6670"/><rect class="fade-late" x="212" y="34" width="10" height="16" fill="#5a6670"/>
+          <rect class="fade-late" x="56" y="26" width="188" height="8" fill="#bdb5a4"/>
+          <g class="fade-late" fill="#e8b04b" font-size="12" font-family="Noto Sans TC,sans-serif"><path d="M56,16 H244" stroke="#e8b04b"/><path d="M56,12 v8 M244,12 v8" stroke="#e8b04b"/><text x="150" y="12" text-anchor="middle">橋面寬 5.2 m</text><text x="150" y="120" text-anchor="middle" fill="#fff">鏤空圓拱</text><text x="228" y="47" fill="#9fb6c9">鋼鈑梁</text></g>
+        </svg>
+        <p class="note">上圖為沿橋軸方向看的橋墩正面；主畫面則是由河上游側看的側面。</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="girders" data-year="1936" data-yeartext="1935–1936" data-era="架梁" data-l="中和庄" data-r="臺北市川端町" data-title="鋼鈑梁">
+      <div class="card">
+        <p class="kicker">第五章｜來自神戶的鋼</p>
+        <h2>14孔上承式鋼鈑梁</h2>
+        <p>橋墩之上架設<strong>14孔上承式鋼鈑梁</strong>。這批鋼梁由日本<strong>三菱重工業神戶造船所</strong>於1935年製造，以鉚釘接合，渡海運抵臺灣。</p>
+        <p>近九十年後，梁上仍保留一片當年的<strong>製造銘版</strong>，浮雕著「三菱重工業株式會社 神戶造船所製作 昭和十年」。基礎、橋墩與鉚接鋼鈑梁，至今都是日治時期的原始構件。</p><p class="note">3D 模型中的淺綠色漆面，依據近年橋下實拍照片中鋼梁的顏色。</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="open" data-year="1937" data-era="開通" data-l="中和庄 溪洲" data-r="臺北市川端町" data-title="開通">
+      <div class="card">
+        <p class="kicker">第六章｜1937年3月25日</p>
+        <h2>川端橋開通</h2>
+        <div class="stats">
+          <div><b>300.56<small> m</small></b><span>橋長</span></div>
+          <div><b>5.2<small> m</small></b><span>橋寬・雙線車道</span></div>
+          <div><b>25.2<small>萬圓</small></b><span>工費（252,000日圓）</span></div>
+        </div>
+        <p>1937年2月竣工，3月25日上午舉行開通典禮。因連接臺北市川端町而名<strong>「川端橋」</strong>，與臺北橋、明治橋（今中山橋）、昭和橋（今光復橋）並列<strong>臺北四大名橋</strong>。</p>
+        <p>從此溪洲人步行、騎腳踏車、拉人力車就能直抵臺北城南——渡船的時代結束了。</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="rename" data-year="1945" data-era="戰後" data-l="中和鄉 溪洲" data-r="臺北市 古亭區" data-title="改名">
+      <div class="card">
+        <p class="kicker">第七章｜1945 戰後</p>
+        <h2>川端橋改名「中正橋」</h2>
+        <div class="plaque-wrap" aria-hidden="true"><div class="plaque"><div class="front">川端橋</div><div class="back">中正橋</div></div></div>
+        <p>1945年日本戰敗，同年11月川端橋改名<strong>「中正橋」</strong>，川端町則併入古亭區（今中正區）。1953年修築堤防後，網溪別墅前的河景就此改變；1958年，永和自中和鄉分出設鎮。</p>
+        <p>橋名換了，橋身卻仍是那13座拱墩與14孔鋼梁——直到人潮開始湧入。</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="widen" data-year="1972" data-yeartext="1954–1972" data-era="三次拓寬" data-l="永和" data-r="臺北" data-title="拓寬">
+      <div class="card">
+        <p class="kicker">第八章｜被包起來的老橋</p>
+        <h2>三次拓寬：從5.2公尺到24.5公尺</h2>
+        <svg class="mini" viewBox="0 0 340 150" role="img" aria-label="橋面寬度演變示意">
+          <g font-family="Noto Sans TC,sans-serif" font-size="12" fill="#c5c9d3">
+            <text x="8" y="36">1937</text><text x="8" y="80">1961</text><text x="8" y="124">1972</text>
+          </g>
+          <rect class="bar d1" x="159" y="24" width="62" height="16" rx="3" fill="#e8b04b"/>
+          <rect class="bar d2" x="97" y="68" width="185" height="16" rx="3" fill="#8f9496"/>
+          <rect class="bar d2" x="159" y="68" width="62" height="16" rx="3" fill="#e8b04b"/>
+          <rect class="bar d3" x="43" y="112" width="294" height="16" rx="3" fill="#8f9496"/>
+          <rect class="bar d3" x="159" y="112" width="62" height="16" rx="3" fill="#e8b04b"/>
+          <g font-family="Noto Sans TC,sans-serif" font-size="12" fill="#fff" text-anchor="middle">
+            <text x="190" y="18">5.2 m</text><text class="fade-late" x="300" y="80" style="transition-delay:1.4s">15.4 m</text><text class="fade-late" x="190" y="146">24.5 m・六車道</text>
+          </g>
+        </svg>
+        <p>戰後永和人口激增，窄橋不敷使用。<strong>1954年</strong>首次加寬；<strong>1961年</strong>拓寬至15.4公尺，並自1962年底向永和端延伸約100公尺（1963年5月完工）；<strong>1972年</strong>第三次拓寬完成，橋面達24.5公尺、雙向六車道，全長約500公尺、16墩17孔。</p>
+        <p>新的混凝土橋面與橋墩把日治原橋包在中間——川端橋從此<strong>「藏身」中正橋下</strong>數十年。</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="toll" data-year="1973" data-era="過橋收費" data-l="永和鎮" data-r="臺北市" data-title="收費站">
+      <div class="card">
+        <p class="kicker">第九章｜1973 過橋要錢</p>
+        <h2>永和端的收費站</h2>
+        <p>1973年7月起，中正橋開始收取<strong>過橋費</strong>，收費站設在永和端的上下橋處——永和端原有的牌坊一帶，就是它的舊址。</p>
+        <p>後來刑事警察局破獲收費員<strong>偽造繳費證</strong>、中飽私囊的弊案，政府撤換全部收費員並提前停收。每天清晨湧過中正橋進城的機車洪流，則成了中永和通勤的經典畫面。</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="danger" data-year="1999" data-yeartext="1990s–2014" data-era="危橋" data-l="永和" data-r="臺北" data-title="危橋">
+      <div class="card">
+        <p class="kicker">第十章｜老化</p>
+        <h2>臺北市十大危橋之首</h2>
+        <p>半世紀的車流、老化與新店溪洪水，讓中正橋出現長達<strong>230公分的剪力裂縫</strong>，被列為臺北市十大危橋之首；橋面高程不足現行防洪標準，耐震能力也不足。</p>
+        <p>拆除重建看似唯一選項——但橋下那13座日治拱墩與鋼梁，要跟著一起消失嗎？</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="heritage" data-year="2015" data-era="文化資產" data-l="永和" data-r="臺北" data-title="歷史建築">
+      <div class="card">
+        <p class="kicker">第十一章｜2015 轉折</p>
+        <h2>從待拆危橋到歷史建築</h2>
+        <p>2015年3月，臺北市政府決定保留而非拆除；<strong>9月1日</strong>，文化局公告日治時期興建的<strong>P1至P13號橋墩及其上鋼鈑梁</strong>為「歷史建築」。</p>
+        <p>它是臺北市<strong>唯一留存至今的日治時期聯外橋梁</strong>。方案定案：在下游側另建新橋供車行，原橋卸下後期拓寬的構造，還原為人行與自行車橋。</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="newbuild" data-year="2023" data-yeartext="2019–2023" data-era="新橋施工" data-l="永和" data-r="臺北" data-title="新中正橋">
+      <div class="card">
+        <p class="kicker">第十二章｜鋼拱升起</p>
+        <h2>國內最大跨度三點式鋼拱橋</h2>
+        <div class="stats">
+          <div><b>215<small> m</small></b><span>拱跨</span></div>
+          <div><b>50<small> m</small></b><span>拱高</span></div>
+          <div><b>≈46<small> m</small></b><span>最大橋寬</span></div>
+        </div>
+        <p><strong>2019年5月6日</strong>中正橋改建工程開工，雙北合計投入約33億元。新橋建在舊橋下游側，採透空拱肋鋼拱：雙拱肋以鋼管連成桁架，一端單腳、另一端分岔為兩腳落地，形成「三點式」支承。</p>
+        <p><strong>2023年6月18日</strong>完成最關鍵的一步：先在低處組裝約1,800噸、水平長約107.5公尺的中段拱肋，再以油壓千斤頂頂升約29公尺與兩側合攏，作業高度由約50公尺降到17公尺。主梁同心圓曲線夾推與鋼拱肋提升，都是國內鋼拱橋首次應用的工法。</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="newopen" data-year="2024" data-yeartext="2023–2024" data-era="分階段通車" data-l="永和" data-r="臺北" data-title="新橋通車">
+      <div class="card">
+        <p class="kicker">第十三章｜琴瑟和鳴</p>
+        <h2>新中正橋分階段通車</h2>
+        <ul class="phases">
+          <li><time>2023.10.08</time><span>第一階段：臺北往新北方向改走新橋</span></li>
+          <li><time>2023.11.18</time><span>臺北往新北全部車道開放</span></li>
+          <li><time>2024.03.16</time><span>第二階段：雙向通車</span></li>
+          <li><time>2024.07.20</time><span>機車專用道開放</span></li>
+          <li><time>2024.11.17</time><span>水源快速道路匝道開通，改建完工</span></li>
+        </ul>
+        <p>景觀設計以<strong>「琴瑟和鳴」</strong>為概念，靈感來自「網溪泛月」的弦月；兩側共28條鋼纜如琴弦，與身旁的老橋相互唱和。</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="restore" data-year="2026" data-yeartext="2024–2026" data-era="復舊工程" data-l="永和" data-r="臺北" data-title="復舊">
+      <div class="card">
+        <p class="kicker">第十四章｜卸甲・抬升・還原</p>
+        <h2>川端橋復舊工程</h2>
+        <svg class="mini" viewBox="0 0 340 120" role="img" aria-label="拆除拓寬構造並抬升原橋示意">
+          <rect x="0" y="96" width="340" height="24" fill="#23405a" opacity=".6"/>
+          <rect class="rs-wide" x="23" y="62" width="294" height="16" rx="3" fill="#8f9496"/>
+          <g class="rs-core"><rect x="139" y="62" width="62" height="16" rx="3" fill="#e8b04b"/><rect x="146" y="78" width="8" height="18" fill="#cfc6b4"/><rect x="186" y="78" width="8" height="18" fill="#cfc6b4"/></g>
+          <g class="fade-late" font-family="Noto Sans TC,sans-serif" font-size="12" fill="#fff" text-anchor="middle"><path d="M230,74 v-20" stroke="#e8b04b" stroke-width="2"/><path d="M225,58 l5,-7 l5,7" fill="#e8b04b"/><text x="270" y="50">整體抬升</text><text x="170" y="30">淨寬 5.2 m・橋面寬 6 m</text></g>
+        </svg>
+        <p>車流移往新橋後，工程拆除1960–70年代加寬的混凝土構造，只留下日治原橋，並將<strong>整座橋體抬升</strong>以符合防洪標準。修復中發現鋼梁多處鏽蝕，依文資規範<strong>補強並還原原始漆面</strong>；護欄依原始造型<strong>等比例復刻</strong>，橋面鋪設木棧道。</p>
+        <p>橋面寬6公尺、淨寬5.2公尺——正好回到1937年的寬度。</p>
+      </div>
+    </article>
+
+    <article class="step" data-scene="finale" data-year="2026" data-yeartext="2026.09.21" data-era="修復啟用" data-l="永和・楊三郎美術館" data-r="臺北・紀州庵文學森林" data-title="重生">
+      <div class="card">
+        <p class="kicker">終章｜2026年9月21日</p>
+        <h2>老橋重生</h2>
+        <p>啟用典禮於傍晚舉行，臺北市長蔣萬安與新北市長侯友宜共同主持。拱墩下的<strong>投射燈</strong>勾勒出拱形線條，光影投映在新橋的鋼拱上。</p>
+        <p>川端橋一端連著臺北的<strong>紀州庵文學森林</strong>，一端連著永和的<strong>楊三郎美術館</strong>（網溪別墅），串成跨越雙北的日治藝文廊道；中正河濱公園的高空景觀橋、景觀塔與「川端落霞廣場」觀景平台，預計2026年底完工。</p>
+        <p>八十九年前，它讓溪洲人免於渡河之苦；如今，它讓人慢下來，重新走過新店溪。</p>
+      </div>
+    </article>
+  </div>
+</section>
+
+<section class="block" id="map" aria-labelledby="mapTitle">
+  <div class="block-head">
+    <p class="kicker">地理</p>
+    <h2 id="mapTitle">新店溪的大彎與兩岸</h2>
+    <p>新店溪由東南方的公館一帶流來，繞過永和北緣後向西，再北轉匯入淡水河。川端橋正好跨在大彎的北段，一端是臺北城南的川端町（今中正區），一端是古稱溪洲的永和。切換年代、點選地標查看說明。</p>
+  </div>
+  <div class="map-wrap">
+    <div class="map-box">
+      <div class="map-tools" role="group" aria-label="切換年代">
+        <button class="seg" data-era="1930" aria-pressed="false">1930年代</button>
+        <button class="seg" data-era="now" aria-pressed="true">2026 今日</button>
+      </div>
+      <svg id="mapSvg" viewBox="0 0 1000 694" data-era="now" role="img" aria-label="川端橋周邊地圖"></svg>
+    </div>
+    <aside class="map-info" id="mapInfo" aria-live="polite">
+      <div class="meta">點選地圖上的地標</div>
+      <h3>川端橋</h3>
+      <p>地圖以 OpenStreetMap 的新店溪河道中心線為底、經簡化繪製；橋梁與地標為實際座標，河道寬度與行政區範圍為示意。</p>
+    </aside>
+  </div>
+</section>
+
+<section class="block" id="numbers" aria-labelledby="numTitle">
+  <div class="block-head">
+    <p class="kicker">數字裡的川端橋</p>
+    <h2 id="numTitle">一座橋的尺度</h2>
+  </div>
+  <div class="num-grid">
+    <div class="num old"><b data-count="1937">0</b><span>開通年份（3月25日）</span></div>
+    <div class="num old"><b data-count="300.56" data-dec="2">0</b><span>原橋長（公尺）</span></div>
+    <div class="num old"><b data-count="5.2" data-dec="1">0</b><span>原橋寬（公尺），復舊後淨寬相同</span></div>
+    <div class="num old"><b data-count="14">0</b><span>孔上承式鋼鈑梁（1935 神戶製）</span></div>
+    <div class="num old"><b data-count="13">0</b><span>座雙柱式拱型橋墩（P1–P13）</span></div>
+    <div class="num"><b data-count="24.5" data-dec="1">0</b><span>1972年拓寬後橋寬（公尺）</span></div>
+    <div class="num"><b data-count="230">0</b><span>剪力裂縫長度（公分）</span></div>
+    <div class="num"><b data-count="215">0</b><span>新中正橋拱跨（公尺）</span></div>
+    <div class="num"><b data-count="50">0</b><span>新橋拱高（公尺）</span></div>
+    <div class="num"><b data-count="28">0</b><span>鋼纜（兩側合計）</span></div>
+    <div class="num"><b data-count="1800">0</b><span>中段拱肋頂升重量（噸）</span></div>
+    <div class="num"><b data-count="33">0</b><span>改建總經費（億元，雙北分攤）</span></div>
+  </div>
+</section>
+
+<section class="block" id="timeline" aria-labelledby="tlTitle">
+  <div class="block-head">
+    <p class="kicker">完整年表</p>
+    <h2 id="tlTitle">從渡船頭到人行橋</h2>
+  </div>
+  <div class="tl" id="tl"></div>
+</section>
+
+<section class="block" id="sources" aria-labelledby="srcTitle">
+  <div class="block-head">
+    <p class="kicker">資料來源</p>
+    <h2 id="srcTitle">參考資料</h2>
+  </div>
+  <ul class="src">
+    <li><a href="https://zh.wikipedia.org/zh-tw/%E4%B8%AD%E6%AD%A3%E6%A9%8B" target="_blank" rel="noopener">維基百科〈中正橋〉</a></li>
+    <li><a href="https://tcmb.culture.tw/zh-tw/detail?indexCode=Culture_Object&amp;id=298274" target="_blank" rel="noopener">國家文化記憶庫〈中正橋（川端橋）〉</a></li>
+    <li><a href="https://pwd.gov.taipei/News_Content.aspx?n=6AE9B4DE5F957F40&amp;s=09CF82069E534CEA" target="_blank" rel="noopener">臺北市政府工務局〈再現歷史風華！「川端橋」修復再利用完工啟用！〉</a></li>
+    <li><a href="https://nco.gov.taipei/News_Content.aspx?n=7EE365D1FB56CD2C&amp;sms=72544237BBE4C5F6&amp;s=36F771E668A929A6" target="_blank" rel="noopener">臺北市新建工程處〈中正橋改建之鋼拱主構件吊升合攏完成〉</a></li>
+    <li><a href="https://www.gov.taipei/News_Content.aspx?n=F0DDAF49B89E9413&amp;sms=72544237BBE4C5F6&amp;s=7AA78A77ED9A8F37" target="_blank" rel="noopener">臺北市政府〈國內最大跨度透空拱肋鋼拱橋即將完工部分通車〉</a></li>
+    <li><a href="https://udn.com/news/story/7323/9768982" target="_blank" rel="noopener">聯合新聞網〈川端橋今啟用 延續老橋新的生命力〉</a></li>
+    <li><a href="https://udn.com/news/story/7323/9768847" target="_blank" rel="noopener">聯合新聞網〈87年川端橋重獲新生〉</a></li>
+    <li><a href="https://news.ltn.com.tw/news/life/breakingnews/5532664" target="_blank" rel="noopener">自由時報〈歷史建築川端橋重建完成9/21重新啟用〉</a></li>
+    <li><a href="https://news.ltn.com.tw/news/life/breakingnews/1877839" target="_blank" rel="noopener">自由時報〈藏身中正橋下數十年「網溪泛月」美景將重見天日〉</a></li>
+    <li><a href="https://www.mirrordaily.news/story/86194" target="_blank" rel="noopener">鏡報〈歷史橋樑命運大不同！明治橋不見天日 川端橋9/21復舊重啟〉</a></li>
+    <li><a href="https://www.mirrordaily.news/story/87110" target="_blank" rel="noopener">鏡報〈川端橋今復舊重啟〉</a></li>
+    <li><a href="https://n.yam.com/Article/20260921750592" target="_blank" rel="noopener">蕃新聞〈歷史建築「川端橋」風華再現〉</a></li>
+    <li><a href="https://www.anntw.com/articles/20260922-t9AD" target="_blank" rel="noopener">台灣醒報〈川端橋雙北市長啟用〉</a></li>
+    <li><a href="https://city.gvm.com.tw/article/106156" target="_blank" rel="noopener">遠見城市學〈中正橋改建 2階段通車重現川端橋〉</a></li>
+    <li><a href="https://www.shoppingdesign.com.tw/post/view/11911" target="_blank" rel="noopener">ShoppingDesign〈永和「中正橋」新設計亮相〉</a></li>
+    <li><a href="https://victorsong.pixnet.net/blog/posts/11397409992" target="_blank" rel="noopener">時空偵探〈名列台北市十大危橋之首的中正橋，為何能從待拆之身蛻變為歷史建築？〉</a></li>
+    <li><a href="https://travel.setn.com/News/677454" target="_blank" rel="noopener">三立新聞網〈「中正橋－川端橋」的前世今生〉</a></li>
+    <li><a href="https://zh.wikipedia.org/wiki/%E6%B0%B8%E5%92%8C%E7%B6%B2%E6%BA%AA%E5%88%A5%E5%A2%85" target="_blank" rel="noopener">維基百科〈永和網溪別墅〉</a></li>
+    <li><a href="https://zh.wikipedia.org/zh-tw/%E5%B7%9D%E7%AB%AF%E7%94%BA_(%E8%87%BA%E5%8C%97%E5%B8%82)" target="_blank" rel="noopener">維基百科〈川端町（臺北市）〉</a>、<a href="https://zh.wikipedia.org/zh/%E7%B4%80%E5%B7%9E%E5%BA%B5" target="_blank" rel="noopener">〈紀州庵〉</a></li>
+    <li><a href="https://commons.wikimedia.org/wiki/File:Zhongzheng_Bridge_20240718.jpg" target="_blank" rel="noopener">Wikimedia Commons：Zhongzheng Bridge 20240718（臺北市政府）</a>、<a href="https://commons.wikimedia.org/wiki/File:Zhongzheng_Bridge_2024.jpg" target="_blank" rel="noopener">Zhongzheng Bridge 2024</a>、<a href="https://commons.wikimedia.org/wiki/File:%E4%B8%AD%E6%AD%A3%E6%A9%8B%E5%90%8A%E8%A3%9D%E7%A9%BA%E6%8B%8D202303.jpg" target="_blank" rel="noopener">中正橋吊裝空拍202303</a>（3D 建模參考）</li>
+    <li><a href="https://commons.wikimedia.org/wiki/File:%E4%B8%AD%E6%AD%A3%E6%A9%8B(%E5%B7%9D%E7%AB%AF%E6%A9%8B).jpg" target="_blank" rel="noopener">Wikimedia Commons：中正橋（川端橋）</a>、<a href="https://commons.wikimedia.org/wiki/File:Taipei_Kawabatach%C5%8D_Bridge_Structure.JPG" target="_blank" rel="noopener">Taipei Kawabatachō Bridge Structure</a>、<a href="https://commons.wikimedia.org/wiki/File:Manufacturer%27s_plate_of_the_Kawabata_Bridge.jpg" target="_blank" rel="noopener">Manufacturer's plate of the Kawabata Bridge</a>（拱墩、鋼梁與銘版參考）</li>
+    <li><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">地圖與河道資料 © OpenStreetMap contributors（ODbL）</a>；3D 引擎 <a href="https://threejs.org/" target="_blank" rel="noopener">three.js</a></li>
+  </ul>
+  <div class="caveat"><strong>關於史料差異：</strong>各來源對拓寬年份的記載略有出入（1954／1961–63／1972 或「1963、1972 兩次」），本頁依維基百科的分期並註明；原橋寬亦有5.2公尺與5.3公尺兩說，採多數官方資料的5.2公尺。「裕仁皇太子賞菊促成建橋」一說未見於當年報載行程，以傳說標示。3D 場景以史料尺寸建模（橋長300.56 m、14孔、13墩、寬5.2 m；新橋拱跨215 m、拱高50 m、28條鋼纜），但細部構造（拓寬段梁數、墩位、抬升高度約1.5 m）與城市建築為依照片推估或程序生成的示意，非工程圖。</div>
+</section>
+
+<footer>川端橋 1937–2026｜資料整理至2026年9月｜3D 場景為依史料與照片重建的示意，非工程圖</footer>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script src="js/page.js"></script>
+<script type="module" src="js/scene3d.js"></script>
+</body>
+</html>
