@@ -4,6 +4,8 @@ Each chapter's fixed camera shot is rendered from the three.js scene (beauty, de
 Here the beauty render is repainted with SDXL img2img, while a depth ControlNet locks the
 geometry (bridge piers, arch, river banks) to the historically-dimensioned 3D model.
 
+Behind an HTTP proxy (e.g. a Claude Code cloud sandbox) install the proxy extra first:
+    pip install 'modal[api-proxy-support]'
 Run (needs MODAL_TOKEN_ID / MODAL_TOKEN_SECRET):
     modal run plates/modal_plates.py --only "00_reopen,08_widen" --variants 2
 Outputs: plates/raw/<id>_v<n>.jpg
@@ -20,12 +22,13 @@ app = modal.App("kawabata-plates")
 
 image = modal.Image.debian_slim(python_version="3.11").pip_install(
     "torch==2.4.1", "diffusers==0.31.0", "transformers==4.46.3", "accelerate==1.1.1",
-    "safetensors==0.4.5", "pillow==11.0.0", "numpy<2",
+    "safetensors==0.4.5", "pillow==11.0.0", "numpy<2", "opencv-python-headless==4.10.0.84",
 )
 cache = modal.Volume.from_name("kawabata-hf-cache", create_if_missing=True)
 
 BASE_MODEL = "SG161222/RealVisXL_V4.0"
 CONTROLNET = "diffusers/controlnet-depth-sdxl-1.0"
+CONTROLNET_EDGE = "diffusers/controlnet-canny-sdxl-1.0"
 VAE = "madebyollin/sdxl-vae-fp16-fix"
 
 
@@ -37,7 +40,7 @@ class Painter:
         import torch
         from diffusers import (AutoencoderKL, ControlNetModel, DPMSolverMultistepScheduler,
                                StableDiffusionXLControlNetImg2ImgPipeline, StableDiffusionXLImg2ImgPipeline)
-        cn = ControlNetModel.from_pretrained(CONTROLNET, torch_dtype=torch.float16, cache_dir="/cache")
+        cn = [ControlNetModel.from_pretrained(m, torch_dtype=torch.float16, cache_dir="/cache") for m in (CONTROLNET, CONTROLNET_EDGE)]
         vae = AutoencoderKL.from_pretrained(VAE, torch_dtype=torch.float16, cache_dir="/cache")
         self.pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
             BASE_MODEL, controlnet=cn, vae=vae, torch_dtype=torch.float16, cache_dir="/cache").to("cuda")
@@ -47,16 +50,21 @@ class Painter:
 
     @modal.method()
     def paint(self, beauty: bytes, depth: bytes, prompt: str, negative: str, strength: float,
-              cn_scale: float, seed: int) -> bytes:
+              cn_scale: float, edge_scale: float, seed: int) -> bytes:
+        import cv2
+        import numpy as np
         import torch
         from PIL import Image
-        init = Image.open(io.BytesIO(beauty)).convert("RGB")
-        ctrl = Image.open(io.BytesIO(depth)).convert("RGB")
         W1, H1 = 1536, 864
+        init = Image.open(io.BytesIO(beauty)).convert("RGB").resize((W1, H1), Image.LANCZOS)
+        ctrl = Image.open(io.BytesIO(depth)).convert("RGB").resize((W1, H1), Image.BILINEAR)
+        # edges of the 3D render lock the fine structure (arched pier openings, railings, arch truss)
+        gray = cv2.cvtColor(np.asarray(init), cv2.COLOR_RGB2GRAY)
+        edges = Image.fromarray(cv2.Canny(cv2.GaussianBlur(gray, (3, 3), 0), 60, 160)).convert("RGB")
         g = torch.Generator("cuda").manual_seed(seed)
         img = self.pipe(prompt=prompt, negative_prompt=negative,
-                        image=init.resize((W1, H1), Image.LANCZOS), control_image=ctrl.resize((W1, H1), Image.BILINEAR),
-                        strength=strength, controlnet_conditioning_scale=cn_scale, control_guidance_end=0.85,
+                        image=init, control_image=[ctrl, edges],
+                        strength=strength, controlnet_conditioning_scale=[cn_scale, edge_scale], control_guidance_end=[0.85, 0.7],
                         num_inference_steps=34, guidance_scale=5.0, generator=g).images[0]
         # second pass at full HD: low-strength refinement adds fine photographic texture
         img = self.refine(prompt=prompt, negative_prompt=negative, image=img.resize((1920, 1080), Image.LANCZOS),
@@ -78,8 +86,9 @@ def main(only: str = "", variants: int = 2):
         beauty = (ROOT / "passes" / f"{pid}_beauty.jpg").read_bytes()
         depth = (ROOT / "passes" / f"{pid}_depth.png").read_bytes()
         for v in range(variants):
-            jobs.append((pid, v, (beauty, depth, prompt, negative, p.get("strength", era["strength"]),
-                                  p.get("cn", 0.7), 1937 + 101 * v + sum(map(ord, pid)))))
+            strength = min(0.82, p.get("strength", era["strength"]) + 0.1 * v)  # v1 repaints more freely
+            jobs.append((pid, v, (beauty, depth, prompt, negative, strength,
+                                  p.get("cn", 0.7), p.get("edge", 0.45), 1937 + 101 * v + sum(map(ord, pid)))))
     painter = Painter()
     for (pid, v, _), img in zip(jobs, painter.paint.starmap([j[2] for j in jobs])):
         (out / f"{pid}_v{v}.jpg").write_bytes(img)

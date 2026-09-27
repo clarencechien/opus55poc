@@ -11,11 +11,6 @@ on:
         description: "Variants per plate"
         required: false
         default: "2"
-  push:
-    paths:
-      - "plates/prompts.json"
-      - "plates/modal_plates.py"
-      - "plates/passes/**"
 
 permissions:
   contents: write

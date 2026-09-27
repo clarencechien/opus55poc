@@ -3,7 +3,7 @@
   "id": "00_reopen",
   "era": "new",
   "time": "night",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
     "t": "川端橋",
@@ -19,7 +19,7 @@
   "id": "01_ferry",
   "era": "old",
   "time": "night",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
     "t": "網溪渡",
@@ -51,7 +51,7 @@
   "id": "02_kawabata",
   "era": "old",
   "time": "dusk",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
     "t": "臺北",
@@ -75,7 +75,7 @@
   "id": "03_petition",
   "era": "old",
   "time": "day",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
     "t": "網溪渡",
@@ -99,14 +99,14 @@
   "id": "04_piers",
   "era": "old",
   "time": "day",
-  "ai": false,
+  "ai": true,
   "labels": []
  },
  "girders": {
   "id": "05_girders",
   "era": "old",
   "time": "day",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
     "t": "臺北",
@@ -130,31 +130,23 @@
   "id": "06_open",
   "era": "old",
   "time": "day",
-  "ai": false,
+  "ai": true,
   "labels": [
-   {
-    "t": "臺北",
-    "s": "川端町・古亭",
-    "warn": false,
-    "x": 0.9641,
-    "y": 0.4014,
-    "z": 0.9917240992402203
-   },
    {
     "t": "新店溪",
     "s": "往下游・淡水河 →",
     "warn": false,
-    "x": 0.1317,
-    "y": 0.4519,
-    "z": 0.9928351307750269
+    "x": 0.2579,
+    "y": 0.4586,
+    "z": 0.9930290225349137
    },
    {
     "t": "川端橋",
     "s": "1937 原橋",
     "warn": false,
-    "x": 0.7282,
-    "y": 0.444,
-    "z": 0.986696239269559
+    "x": 0.7484,
+    "y": 0.4344,
+    "z": 0.9814053528750261
    }
   ]
  },
@@ -162,23 +154,23 @@
   "id": "07_rename",
   "era": "old",
   "time": "dusk",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
-    "t": "溪洲",
-    "s": "中和庄（今永和）",
+    "t": "臺北",
+    "s": "川端町・古亭",
     "warn": false,
-    "x": 0.9778,
-    "y": 0.351,
-    "z": 0.9914556784031632
+    "x": 0.8423,
+    "y": 0.3566,
+    "z": 0.9763953325976257
    },
    {
-    "t": "川端橋",
-    "s": "1937 原橋",
+    "t": "觀音山",
+    "s": "",
     "warn": false,
-    "x": 0.9784,
-    "y": 0.3312,
-    "z": 0.96114724590672
+    "x": 0.1319,
+    "y": 0.3988,
+    "z": 0.999739525910518
    }
   ]
  },
@@ -186,7 +178,7 @@
   "id": "08_widen",
   "era": "mid",
   "time": "day",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
     "t": "新店溪",
@@ -202,23 +194,23 @@
   "id": "09_toll",
   "era": "mid",
   "time": "day",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
     "t": "新北市 永和區",
     "s": "",
     "warn": false,
-    "x": 0.3082,
-    "y": 0.1266,
-    "z": 0.9805413901897679
+    "x": 0.6082,
+    "y": 0.2533,
+    "z": 0.9823562217013918
    },
    {
     "t": "收費站",
     "s": "1973",
     "warn": false,
-    "x": 0.67,
-    "y": 0.3133,
-    "z": 0.9446988696202226
+    "x": 0.6791,
+    "y": 0.2993,
+    "z": 0.9333241146427698
    }
   ]
  },
@@ -226,7 +218,7 @@
   "id": "10_danger",
   "era": "mid",
   "time": "dusk",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
     "t": "觀音山",
@@ -250,7 +242,7 @@
   "id": "11_heritage",
   "era": "new",
   "time": "night",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
     "t": "川端橋",
@@ -266,7 +258,7 @@
   "id": "12_newbuild",
   "era": "new",
   "time": "day",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
     "t": "新中正橋",
@@ -290,7 +282,7 @@
   "id": "13_newopen",
   "era": "new",
   "time": "day",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
     "t": "臺北101",
@@ -314,7 +306,7 @@
   "id": "14_restore",
   "era": "new",
   "time": "dusk",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
     "t": "觀音山",
@@ -346,7 +338,7 @@
   "id": "15_finale",
   "era": "new",
   "time": "night",
-  "ai": false,
+  "ai": true,
   "labels": [
    {
     "t": "臺北市 中正區",

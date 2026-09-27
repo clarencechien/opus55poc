@@ -1,37 +1,120 @@
 {
-  "negative": "cartoon, illustration, painting, anime, 3d render, cgi, low poly, video game, plastic, toy, lowres, blurry, jpeg artifacts, text, letters, watermark, logo, signature, frame, border, deformed, distorted bridge, extra arches, oversaturated",
+  "negative": "cartoon, illustration, painting, anime, 3d render, cgi, low poly, video game, plastic, toy, lowres, blurry, jpeg artifacts, text, letters, watermark, logo, signature, frame, border, deformed, distorted bridge, extra arches, oversaturated, snow, snow-capped peak, volcano, Mount Fuji, conical mountain",
   "eras": {
     "old": {
       "style": "authentic 1930s photograph of Japanese-colonial era Taiwan, hand-tinted colour, soft focus, natural light, film grain, realistic, historical documentary",
       "negative": "modern buildings, skyscrapers, apartment blocks, cars, highway, power lines, neon",
-      "strength": 0.58
+      "strength": 0.64
     },
     "mid": {
       "style": "1970s Taiwan street photography, faded Kodachrome colour film, 35mm, natural light, realistic, documentary",
       "negative": "skyscrapers, glass towers, modern cars, smartphones",
-      "strength": 0.52
+      "strength": 0.58
     },
     "new": {
       "style": "contemporary architectural photograph, Sony A7R IV, 24mm lens, realistic, highly detailed, natural colour",
-      "strength": 0.5
+      "strength": 0.55
     }
   },
   "plates": {
-    "00_reopen": { "era": "new", "prompt": "night in Taipei, a restored 1937 low concrete pedestrian bridge whose twin-column arched piers glow with warm uplights, beside a modern pale mint-green open-web steel arch road bridge with thin inclined cables, dense apartment towers with lit windows across the wide Xindian River, calm water reflections, moon, long exposure" },
-    "01_ferry": { "era": "old", "prompt": "moonlit night on a wide calm river, small wooden sampan ferry boats with glowing paper lanterns crossing, a ferryman with a pole, low wooden houses and bamboo groves on the dark far bank, the silhouette of Guanyin mountain, reflection of the full moon on the water" },
-    "02_kawabata": { "era": "old", "prompt": "dusk on a wide river beside Taipei, Japanese-style wooden riverside restaurants with lanterns on the bank, traditional roofed houseboats with red paper lanterns drifting on the water, fireflies, the sun setting behind a distant mountain, golden sky reflected in the river" },
-    "03_petition": { "era": "old", "prompt": "rural Taiwan countryside, a two-storey colonial villa with a veranda surrounded by a large field of yellow and white chrysanthemums, farmhouses with dark tiled roofs, bamboo and trees, a river and a mountain in the distance, sunny afternoon" },
-    "04_piers": { "era": "old", "prompt": "construction of a river bridge, a row of reinforced concrete twin-column piers joined by tall round arches standing in a wide river, wooden scaffolding and timber derricks around the piers, no deck yet, a low town and a mountain behind, sunny day", "cn": 0.8 },
-    "05_girders": { "era": "old", "prompt": "construction of a river bridge, long pale green painted riveted steel plate girders resting on concrete twin-column arched piers above a wide river, wooden scaffolding, low town with tiled roofs, mountain behind, sunny day", "cn": 0.8 },
-    "06_open": { "era": "old", "prompt": "opening day of a long low bridge of concrete arched piers and steel girders crossing a wide calm river, small flags along the railing, pedestrians, bicycles and a vintage 1930s car on the deck, riverside town with tiled roofs, mountain behind, bright day", "cn": 0.8 },
-    "07_rename": { "era": "old", "prompt": "dusk at the entrance of an old narrow concrete bridge with four stone name pillars carrying inscribed plaques, low railings, a river and low houses beyond, warm fading light", "strength": 0.34, "cn": 0.85 },
-    "08_widen": { "era": "mid", "prompt": "a wide six-lane concrete road bridge on many piers over a broad river, crowded with motor scooters, cars and buses, tall streetlights, rows of four and five storey concrete apartment buildings along the banks, grassy floodplain and levee, overcast bright day" },
-    "09_toll": { "era": "mid", "prompt": "toll booths under a red canopy at the end of a busy concrete road bridge, motor scooters and cars queuing, rows of 1970s concrete apartment buildings, grassy levee, bright day" },
-    "10_danger": { "era": "mid", "prompt": "underneath an ageing concrete road bridge at dusk, a long diagonal shear crack in a weathered concrete pier cap, rust and water stains, round columns standing in river water, sunset light", "strength": 0.45, "cn": 0.8 },
-    "11_heritage": { "era": "new", "prompt": "night, old 1937 concrete twin-column arched bridge piers glowing golden underneath a wider modern concrete road bridge, reflections in a dark river, city lights of Taipei, moon, long exposure", "strength": 0.45 },
-    "12_newbuild": { "era": "new", "prompt": "construction of a large pale mint-green open-web steel arch bridge beside an old wide concrete road bridge, two yellow tower cranes, green temporary support towers under the arch, dense Taipei city skyline and mountains, clear day, drone photograph" },
-    "13_newopen": { "era": "new", "prompt": "a modern pale mint-green open-web steel arch bridge with inclined cables over a wide river, traffic on the deck, a riverside park and levee, dense Taipei city skyline, blue sky, sunny day" },
-    "14_restore": { "era": "new", "prompt": "golden hour sunset, a restored old concrete pedestrian bridge on twin-column arched piers beside a modern pale mint-green steel arch bridge over a wide river, Taipei skyline, warm light reflected in the water" },
-    "15_finale": { "era": "new", "prompt": "night, view along the deck of a restored historic pedestrian bridge with warm lights along its railings and people strolling, a huge illuminated pale mint-green steel arch bridge alongside, Taipei city lights reflected in the river, long exposure", "strength": 0.45 }
+    "00_reopen": {
+      "era": "new",
+      "prompt": "night in Taipei, a restored 1937 low concrete pedestrian bridge whose twin-column arched piers glow with warm uplights, beside a modern pale mint-green open-web steel arch road bridge with thin inclined cables, dense apartment towers with lit windows across the wide Xindian River, calm water reflections, moon, long exposure"
+    },
+    "01_ferry": {
+      "era": "old",
+      "prompt": "moonlit night on a wide calm river, small wooden sampan ferry boats with glowing paper lanterns crossing, a ferryman with a pole, low wooden houses and bamboo groves on the dark far bank, the silhouette of Guanyin mountain, reflection of the full moon on the water"
+    },
+    "02_kawabata": {
+      "era": "old",
+      "prompt": "dusk on a wide river beside Taipei, a row of Japanese-style wooden riverside restaurants with warm lanterns along the far bank, two traditional roofed houseboats with red paper lanterns on the water, low rounded green hills on the horizon, golden sunset sky reflected in the river",
+      "strength": 0.7
+    },
+    "03_petition": {
+      "era": "old",
+      "prompt": "Taiwanese countryside seen from a low hill: green rice paddies divided by dirt paths, bamboo groves and trees, farmhouses with dark tiled roofs, a two-storey colonial villa with a veranda beside a large field of yellow and white chrysanthemums, a river and low green hills in the distance, sunny afternoon",
+      "strength": 0.86,
+      "edge": 0.3
+    },
+    "04_piers": {
+      "era": "old",
+      "prompt": "construction of a river bridge, a row of reinforced concrete twin-column piers joined by tall round arches standing in a wide river, wooden scaffolding and timber derricks around the piers, no deck yet, a low town and a mountain behind, sunny day",
+      "cn": 0.8
+    },
+    "05_girders": {
+      "era": "old",
+      "prompt": "construction of a river bridge, long pale green painted riveted steel plate girders resting on concrete twin-column arched piers above a wide river, wooden scaffolding, low town with tiled roofs, mountain behind, sunny day",
+      "cn": 0.8
+    },
+    "06_open": {
+      "era": "old",
+      "prompt": "seen from the river, opening day of a long low bridge of concrete twin-column piers and steel girders crossing a wide calm river, small flags along the railing, pedestrians, bicycles and a vintage 1930s car on the deck, riverside town with tiled roofs, low green hills behind, bright day",
+      "cn": 0.8,
+      "strength": 0.68
+    },
+    "07_rename": {
+      "era": "old",
+      "prompt": "dusk, standing on an old narrow concrete bridge deck looking toward its entrance, two stone name pillars with inscribed plaques at the end of the bridge, concrete railings, a pedestrian, low wooden houses with dark tiled roofs beyond, warm fading light",
+      "strength": 0.74,
+      "cn": 0.7,
+      "edge": 0.35,
+      "clean": [
+        [
+          0.652,
+          0.54,
+          0.767,
+          0.586
+        ],
+        [
+          0.04,
+          0.524,
+          0.078,
+          0.54
+        ]
+      ]
+    },
+    "08_widen": {
+      "era": "mid",
+      "prompt": "a wide six-lane concrete road bridge on many piers over a broad river, crowded with motor scooters, cars and buses, tall streetlights, grassy riverside floodplain park with footpaths and trees, rows of four and five storey concrete apartment buildings along the banks, overcast bright day",
+      "strength": 0.8
+    },
+    "09_toll": {
+      "era": "mid",
+      "prompt": "view along a busy concrete road bridge toward toll booths under a red canopy at its far end, motor scooters and taxis, five storey concrete apartment blocks with balconies, windows and shop signboards lining the road, overcast day",
+      "strength": 0.82,
+      "edge": 0.25,
+      "cn": 0.6
+    },
+    "10_danger": {
+      "era": "mid",
+      "prompt": "underneath an ageing concrete road bridge at dusk, a long diagonal shear crack in a weathered concrete pier cap, rust and water stains, round columns standing in river water, sunset light",
+      "strength": 0.6,
+      "cn": 0.8,
+      "edge": 0.5
+    },
+    "11_heritage": {
+      "era": "new",
+      "prompt": "night, old 1937 concrete twin-column arched bridge piers glowing golden underneath a wider modern concrete road bridge, reflections in a dark river, city lights of Taipei, moon, long exposure",
+      "strength": 0.45
+    },
+    "12_newbuild": {
+      "era": "new",
+      "prompt": "busy construction site of a large pale mint-green open-web steel arch bridge beside an old wide concrete road bridge, two yellow tower cranes, green temporary support towers under the arch, grassy riverside park, dense Taipei city skyline with apartment towers, clear day, drone photograph",
+      "strength": 0.78
+    },
+    "13_newopen": {
+      "era": "new",
+      "prompt": "a modern pale mint-green open-web steel arch bridge with inclined cables over a wide river, traffic on the deck, a riverside park and levee, dense Taipei city skyline, blue sky, sunny day"
+    },
+    "14_restore": {
+      "era": "new",
+      "prompt": "golden hour sunset, a restored old concrete pedestrian bridge on twin-column arched piers beside a modern pale mint-green steel arch bridge over a wide river, a grassy riverbank park in the foreground, Taipei skyline, warm light reflected in the water",
+      "strength": 0.72
+    },
+    "15_finale": {
+      "era": "new",
+      "prompt": "night, view along the deck of a restored historic pedestrian bridge with warm lights along its railings and people strolling, a huge illuminated pale mint-green steel arch bridge alongside, Taipei city lights reflected in the river, long exposure",
+      "strength": 0.45
+    }
   }
 }

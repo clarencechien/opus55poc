@@ -29,6 +29,7 @@ if (!usable || new URLSearchParams(location.search).has('live')) {
 
 function startPlates() {
   document.body.classList.add('plate-mode');
+  const hv = document.getElementById('hudView'); if (hv) hv.textContent = '3D 構圖・AI 輔助寫實渲染';
   const canvas = document.createElement('canvas'); canvas.id = 'plate'; canvas.setAttribute('aria-hidden', 'true');
   stage.insertBefore(canvas, stage.firstChild);
   const labelsEl = document.createElement('div'); labelsEl.id = 'plabels'; labelsEl.setAttribute('aria-hidden', 'true');
@@ -87,12 +88,7 @@ vec3 water(sampler2D T, sampler2D W, sampler2D D, vec2 p, float night){
   if (w > 0.01) {
     float lum = dot(c, vec3(.3, .59, .11));
     float glint = pow(vn(vec2(q.x * 900.0, q.y * 2600.0) + uTime * vec2(.6, 1.3)), 14.0);
-    c += w * glint * (0.25 + 1.4 * smoothstep(.35, .9, lum)) * mix(vec3(1.0, .95, .85), vec3(1.0, .82, .55), night);
-  }
-  if (night > .5) { // twinkling city lights
-    float lum = dot(c, vec3(.3, .59, .11));
-    vec2 cell = floor(q * vec2(480.0, 270.0));
-    c *= 1.0 + smoothstep(.62, .95, lum) * 0.14 * sin(uTime * (1.5 + 3.0 * h21(cell)) + 6.28 * h21(cell + 7.0));
+    c += w * glint * (0.12 + 0.6 * smoothstep(.45, .95, lum)) * mix(vec3(1.0, .95, .85), vec3(1.0, .82, .55), night);
   }
   return c;
 }
