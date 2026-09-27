@@ -33,6 +33,8 @@ def prep(bake):
         Image.open(f).convert("RGB").save(out / f"{pid}_beauty.jpg", quality=90)
         stretch_depth(Image.open(bake / f"{pid}_depth.png")).save(out / f"{pid}_depth.png", optimize=True)
         Image.open(bake / f"{pid}_water.png").convert("L").resize((960, 540), Image.BILINEAR).save(out / f"{pid}_water.png", optimize=True)
+        if (bake / f"{pid}_ids.png").exists():
+            Image.open(bake / f"{pid}_ids.png").convert("RGB").save(out / f"{pid}_ids.png", optimize=True)
         print("prepped", pid)
     (out / "labels.json").write_text((bake / "labels.json").read_text())
 
@@ -48,6 +50,8 @@ def web():
         scene = pid.split("_", 1)[1]
         choice = sel.get(pid)
         src = ROOT / "raw" / f"{pid}_v{choice}.jpg" if choice is not None else ROOT / "passes" / f"{pid}_beauty.jpg"
+        if choice is not None and (ROOT / "raw" / f"{pid}_v{choice}d.jpg").exists():  # detail-pass result
+            src = ROOT / "raw" / f"{pid}_v{choice}d.jpg"
         img = Image.open(src).convert("RGB").resize((1920, 1080), Image.LANCZOS)
         keep = ROOT / "passes" / f"keep_{pid}.json"
         if choice is not None and keep.exists():  # paste exact regions (e.g. inscribed name plaques) back from the render

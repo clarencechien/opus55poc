@@ -1,5 +1,5 @@
 {
-  "negative": "cartoon, illustration, painting, anime, 3d render, cgi, low poly, video game, plastic, toy, lowres, blurry, jpeg artifacts, text, letters, watermark, logo, signature, frame, border, deformed, distorted bridge, extra arches, oversaturated, snow, snow-capped peak, volcano, Mount Fuji, conical mountain",
+  "negative": "cartoon, illustration, painting, anime, 3d render, cgi, low poly, video game, plastic, toy, lowres, blurry, jpeg artifacts, text, letters, watermark, logo, signature, frame, border, deformed, distorted bridge, extra arches, oversaturated, snow, snow-capped peak, volcano, Mount Fuji, conical mountain, signage text, gibberish characters",
   "eras": {
     "old": {
       "style": "authentic 1930s photograph of Japanese-colonial era Taiwan, hand-tinted colour, soft focus, natural light, film grain, realistic, historical documentary",
@@ -57,21 +57,7 @@
       "prompt": "dusk, standing on an old narrow concrete bridge deck looking toward its entrance, two stone name pillars with inscribed plaques at the end of the bridge, concrete railings, a pedestrian, low wooden houses with dark tiled roofs beyond, warm fading light",
       "strength": 0.74,
       "cn": 0.7,
-      "edge": 0.35,
-      "clean": [
-        [
-          0.652,
-          0.54,
-          0.767,
-          0.586
-        ],
-        [
-          0.04,
-          0.524,
-          0.078,
-          0.54
-        ]
-      ]
+      "edge": 0.35
     },
     "08_widen": {
       "era": "mid",
@@ -115,6 +101,64 @@
       "era": "new",
       "prompt": "night, view along the deck of a restored historic pedestrian bridge with warm lights along its railings and people strolling, a huge illuminated pale mint-green steel arch bridge alongside, Taipei city lights reflected in the river, long exposure",
       "strength": 0.45
+    }
+  },
+  "detail": {
+    "person": {
+      "strength": 0.62,
+      "max": 8,
+      "prompt": {
+        "old": "Taiwanese pedestrians in 1930s clothing, men in white shirts and straw hats, women in cheongsam and kimono, people walking, realistic",
+        "mid": "Taiwanese people in 1970s clothing riding motor scooters and walking, realistic",
+        "new": "people strolling and cycling, casual modern clothing, realistic"
+      }
+    },
+    "vehicle": {
+      "strength": 0.6,
+      "max": 8,
+      "prompt": {
+        "old": "1930s vintage black automobile, bicycles, rickshaw, realistic",
+        "mid": "1970s Taiwan traffic, motor scooters with riders wearing helmets, yellow taxis, city buses, sedans, realistic",
+        "new": "modern cars, city buses and motor scooters with riders, realistic"
+      }
+    },
+    "tree": {
+      "strength": 0.5,
+      "max": 6,
+      "prompt": {
+        "old": "lush subtropical trees and bamboo groves in the Taiwan countryside, detailed foliage",
+        "mid": "leafy trees on a grassy riverbank, detailed foliage",
+        "new": "leafy riverside park trees, detailed foliage"
+      }
+    },
+    "house": {
+      "strength": 0.5,
+      "max": 6,
+      "prompt": {
+        "old": "Japanese colonial era wooden houses with black tiled hip roofs and deep eaves, plastered walls, wooden sliding windows"
+      }
+    },
+    "farm": {
+      "strength": 0.55,
+      "max": 8,
+      "prompt": {
+        "old": "traditional Taiwanese red brick sanheyuan courtyard farmhouse with gabled clay tile roofs, weathered, surrounded by trees"
+      }
+    },
+    "building": {
+      "strength": 0.45,
+      "max": 4,
+      "prompt": {
+        "mid": "1970s Taipei concrete apartment blocks, balconies with iron window grilles, rooftop water tanks, weathered facades",
+        "new": "Taipei residential towers and apartment buildings, balconies, rooftop water tanks, detailed facades"
+      }
+    },
+    "boat": {
+      "strength": 0.55,
+      "max": 4,
+      "prompt": {
+        "old": "traditional wooden sampan ferry boat with passengers and a boatman, Japanese roofed houseboat with red paper lanterns"
+      }
     }
   }
 }

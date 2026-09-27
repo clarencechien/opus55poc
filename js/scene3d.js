@@ -15,6 +15,8 @@ const stage = canvas.parentElement;
 const loading = document.getElementById('loading');
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const mobile = () => stage.clientWidth <= 760;
+// ?hq = offline bake quality: detailed people, vehicles, trees and houses (never used by the live page)
+const HQ = new URLSearchParams(location.search).has('hq');
 
 let renderer;
 try {
@@ -51,6 +53,8 @@ function vnoise(x, z) {
 const fbm = (x, z, o = 5) => { let s = 0, a = .5, f = 1; for (let i = 0; i < o; i++) { s += a * vnoise(x * f, z * f); f *= 2.03; a *= .5; } return s; };
 
 function NI(g) { return g.index ? g.toNonIndexed() : g; }
+function tint(g, r, gg, b) { g = NI(g); const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = r; a[i * 3 + 1] = gg; a[i * 3 + 2] = b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; }
+function tag(obj, cat) { obj.traverse(o => { o.userData.cat = cat; }); return obj; }
 function merge(list) { const m = mergeGeometries(list.map(NI), false); list.forEach(g => g.dispose()); return m; }
 function box(w, h, d, x = 0, y = 0, z = 0, ry = 0, rx = 0, rz = 0) {
   const g = new THREE.BoxGeometry(w, h, d);
@@ -656,7 +660,7 @@ function cityLots(kind) {
       const north = riverFrameSide(jx, jz) < 0;
       const dens = north ? (0.55 * smooth(1800, 400, r) + 0.08) : 0.05;
       if (rnd() > dens) continue;
-      lots.push({ x: jx, z: jz, w: R(7, 13), d: R(7, 12), h: R(3.4, 5.2), ry: R(-.05, .05) });
+      lots.push({ x: jx, z: jz, w: R(7, 13), d: R(7, 12), h: R(3.4, 5.2), ry: R(-.05, .05), farm: !north });
     } else {
       if (d < W + 104) continue;
       if (Math.abs(jx) < 16 && Math.abs(jz) < 700) continue;
@@ -677,8 +681,25 @@ function riverFrameSide(x, z) { // <0 = north (Taipei) side of the channel, >0 =
   return (b[0] - a[0]) * (z - a[1]) - (b[1] - a[1]) * (x - a[0]) < 0 ? -1 : 1;
 }
 const cityGroups = {};
+function sanheyuanHQ() { // 三合院: main hall + two wings round a courtyard, red brick, gabled clay-tile roofs
+  const P = [], brick = [.6, .33, .25], tile = [.36, .22, .19], dark = [.12, .1, .09];
+  P.push(tint(box(14, 3.4, 5.5, 0, 1.7, -5), ...brick));
+  for (const sx of [-1, 1]) P.push(tint(box(4.6, 3.0, 9, sx * 7.4, 1.5, 2.2), ...brick));
+  const gable = (w, h, len) => { const sh = new THREE.Shape(); sh.moveTo(-w / 2, 0); sh.lineTo(w / 2, 0); sh.lineTo(0, h); sh.lineTo(-w / 2, 0); const g = new THREE.ExtrudeGeometry(sh, { depth: len, bevelEnabled: false }); g.translate(0, 0, -len / 2); return g; };
+  { const g = gable(6.6, 1.9, 15.2); g.rotateY(Math.PI / 2); g.translate(0, 3.4, -5); P.push(tint(g, ...tile)); }
+  for (const sx of [-1, 1]) { const g = gable(5.6, 1.6, 9.6); g.translate(sx * 7.4, 3.0, 2.2); P.push(tint(g, ...tile)); }
+  P.push(tint(box(2.2, 2.3, .12, 0, 1.15, -2.2), ...dark));
+  for (const x of [-4.2, 4.2]) P.push(tint(box(1.2, 1.0, .12, x, 1.8, -2.2), ...dark));
+  for (const sx of [-1, 1]) for (const z of [0, 4]) P.push(tint(box(.12, 1.0, 1.1, sx * 5.08, 1.8, z), ...dark));
+  return merge(P);
+}
+function balconyHQ() { // unit balcony: slab + parapet + iron grille band (1 m wide, scaled per building)
+  return merge([tint(box(1, .18, 1.1, 0, 0, .55), .78, .77, .74), tint(box(1, .95, .08, 0, .55, 1.08), .7, .69, .66), tint(box(1, .06, .06, 0, 1.05, 1.08), .3, .3, .32)]);
+}
+function roofTankHQ() { return merge([tint(cyl(.9, .9, 1.5, 0, .8, 0, 12), .78, .8, .82), tint(box(2.2, .8, 2.2, 0, .4, 0), .5, .5, .5), tint(box(3.2, .9, .12, 0, .45, 2.2), .6, .6, .6)]); }
 function buildCity(kind) {
-  const lots = cityLots(kind);
+  const allLots = cityLots(kind);
+  const lots = HQ && kind === 'old' ? allLots.filter(l => !l.farm) : allLots;
   const grp = new THREE.Group();
   const bg = new THREE.BoxGeometry(1, 1, 1); bg.translate(0, .5, 0);
   const pal = kind === 'old' ? [0xcfc3ad, 0xb8a58a, 0x9c8a74, 0xd8d0c0] : kind === 'mid' ? [0xc9c6bd, 0xb7b3a8, 0xd9d3c3, 0xa9aba6, 0xc4b8a2] : [0xc8ccd0, 0xaab2ba, 0xd6d3cc, 0x9aa3ab, 0xbfb9ad, 0x8e98a2, 0xe0ddd5];
@@ -693,8 +714,28 @@ function buildCity(kind) {
   if (kind === 'old') { // hip roofs (黑瓦)
     const rg = new THREE.ConeGeometry(.75, 1, 4, 1); rg.rotateY(Math.PI / 4); rg.translate(0, .5, 0);
     const rm = new THREE.InstancedMesh(rg, new THREE.MeshStandardMaterial({ color: 0x3b3a3c, roughness: .85 }), lots.length);
-    lots.forEach((l, i) => { M.compose(new THREE.Vector3(l.x, hOld(W + 300, l.x, l.z) - .5 + l.h, l.z), q.setFromEuler(new THREE.Euler(0, l.ry, 0)), new THREE.Vector3(l.w * 1.05, l.h * .55, l.d * 1.05)); rm.setMatrixAt(i, M); });
+    // HQ: deep eaves and a lower pitch like Japanese-era wooden houses
+    lots.forEach((l, i) => { M.compose(new THREE.Vector3(l.x, hOld(W + 300, l.x, l.z) - .5 + l.h - (HQ ? .25 : 0), l.z), q.setFromEuler(new THREE.Euler(0, l.ry, 0)), HQ ? new THREE.Vector3(l.w * 1.32, l.h * .46, l.d * 1.32) : new THREE.Vector3(l.w * 1.05, l.h * .55, l.d * 1.05)); rm.setMatrixAt(i, M); });
     grp.add(rm);
+    tag(grp, 'house');
+    if (HQ) {
+      const farms = allLots.filter(l => l.farm);
+      const fm = new THREE.InstancedMesh(sanheyuanHQ(), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .9, vertexColors: true }), farms.length);
+      farms.forEach((l, i) => { const k = R(.75, 1.05); M.compose(new THREE.Vector3(l.x, hOld(W + 300, l.x, l.z) - .4, l.z), q.setFromEuler(new THREE.Euler(0, Math.floor(R(0, 4)) * Math.PI / 2 + R(-.2, .2), 0)), new THREE.Vector3(k, k, k)); fm.setMatrixAt(i, M); const v = R(.85, 1.1); fm.setColorAt(i, c.setRGB(v, v, v)); });
+      fm.castShadow = fm.receiveShadow = true; grp.add(tag(fm, 'farm'));
+    }
+  } else {
+    tag(grp, 'building');
+    if (HQ) { // balconies with iron grilles and rooftop water tanks: the look of Taipei apartment blocks
+      const near = lots.filter(l => Math.hypot(l.x, l.z) < 1000), bal = [];
+      near.forEach(l => { for (let f = 3.2; f < l.h - 1.5; f += 3.2) if (rnd() < .7) bal.push([l, f]); });
+      const bm = new THREE.InstancedMesh(balconyHQ(), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .85, vertexColors: true }), bal.length);
+      bal.forEach(([l, f], i) => { const side = (Math.round(l.x * 7 + l.z) & 1) ? 1 : -1; M.compose(new THREE.Vector3(l.x, 7 + f, l.z + side * l.d / 2), q.setFromEuler(new THREE.Euler(0, side > 0 ? 0 : Math.PI, 0)), new THREE.Vector3(l.w * .82, 1, 1)); bm.setMatrixAt(i, M); });
+      const tanks = lots.filter(l => Math.hypot(l.x, l.z) < 1600 && rnd() < .8);
+      const tm = new THREE.InstancedMesh(roofTankHQ(), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .6, vertexColors: true }), tanks.length);
+      tanks.forEach((l, i) => { M.compose(new THREE.Vector3(l.x + R(-l.w, l.w) * .25, 7 + l.h, l.z + R(-l.d, l.d) * .25), q.setFromEuler(new THREE.Euler(0, R(0, 3), 0)), new THREE.Vector3(1, 1, 1)); tm.setMatrixAt(i, M); });
+      grp.add(tag(bm, 'building'), tag(tm, 'building'));
+    }
   }
   scene.add(grp);
   cityGroups[kind] = grp;
@@ -717,6 +758,27 @@ const t101 = new THREE.Group();
 scene.add(t101); reg('t101', t101);
 
 // trees: floodplain parks (modern) and bamboo / field trees (1930s)
+function treeBroadHQ(seedOff) {
+  const P = [], bark = [.3, .23, .17];
+  P.push(tint(new THREE.CylinderGeometry(.16, .26, 2.6, 8).translate(0, 1.3, 0), ...bark));
+  for (let k = 0; k < 3; k++) { const a = k * 2.1 + seedOff, e = new THREE.Vector3(Math.cos(a) * 1.0, 3.3, Math.sin(a) * 1.0); P.push(tint(rod(new THREE.Vector3(0, 2.2, 0), e, .07, 5), ...bark)); }
+  for (let k = 0; k < 8; k++) {
+    const a = k * 0.83 + seedOff * 3, r = k === 0 ? 0 : .9 + (k % 3) * .25, rad = 1.0 + ((k * 37 + seedOff * 11) % 7) * .09;
+    const g = new THREE.IcosahedronGeometry(rad, 1); g.scale(1, .82, 1); g.translate(Math.cos(a) * r, 3.5 + (k % 2) * .5 + (k === 0 ? .6 : 0), Math.sin(a) * r);
+    const v = .78 + (k % 4) * .07; P.push(tint(g, .2 * v, .36 * v, .15 * v));
+  }
+  return merge(P);
+}
+function bambooHQ() {
+  const P = [];
+  for (let k = 0; k < 11; k++) {
+    const a = k * 2.4, r0 = .35 + (k % 3) * .15, base = new THREE.Vector3(Math.cos(a) * r0, 0, Math.sin(a) * r0);
+    const top = new THREE.Vector3(Math.cos(a) * (r0 + 1.3 + (k % 2)), 7.5 + (k % 4) * .7, Math.sin(a) * (r0 + 1.3 + (k % 2)));
+    P.push(tint(rod(base, top, .045, 5), .45, .5, .26));
+    const g = new THREE.IcosahedronGeometry(.9, 1); g.scale(.7, 1.6, .7); g.translate(top.x * .96, top.y - .6, top.z * .96); P.push(tint(g, .32, .45, .18));
+  }
+  return merge(P);
+}
 function trees(kind) {
   const pos = [];
   for (let i = 0; i < (kind === 'old' ? 2600 : 1600); i++) {
@@ -725,12 +787,23 @@ function trees(kind) {
     if (kind === 'old') { if (d < W + 18 || rnd() > .7) continue; pos.push([x, hOld(d, x, z), z, R(1.8, 3.6)]); }
     else { if (d < W + 8 || d > W + 60) continue; pos.push([x, hNew(d, x, z), z, R(2, 3.8)]); }
   }
-  const g = new THREE.IcosahedronGeometry(1, 1); g.translate(0, 1.1, 0);
-  const im = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .95 }), pos.length);
-  const M = new THREE.Matrix4(), c = new THREE.Color();
-  pos.forEach(([x, y, z, s], i) => { M.compose(new THREE.Vector3(x, y - .3, z), new THREE.Quaternion(), new THREE.Vector3(s * R(.8, 1.2), s * R(1.1, 1.8), s * R(.8, 1.2))); im.setMatrixAt(i, M); im.setColorAt(i, c.setHSL(R(.22, .3), R(.3, .45), R(.09, .16))); });
-  im.receiveShadow = true;
-  const grp = new THREE.Group(); grp.add(im); scene.add(grp); return grp;
+  const grp = new THREE.Group(), M = new THREE.Matrix4(), c = new THREE.Color();
+  if (!HQ) {
+    const g = new THREE.IcosahedronGeometry(1, 1); g.translate(0, 1.1, 0);
+    const im = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .95 }), pos.length);
+    pos.forEach(([x, y, z, s], i) => { M.compose(new THREE.Vector3(x, y - .3, z), new THREE.Quaternion(), new THREE.Vector3(s * R(.8, 1.2), s * R(1.1, 1.8), s * R(.8, 1.2))); im.setMatrixAt(i, M); im.setColorAt(i, c.setHSL(R(.22, .3), R(.3, .45), R(.09, .16))); });
+    im.receiveShadow = true; grp.add(im);
+  } else {
+    const variants = kind === 'old' ? [treeBroadHQ(0), treeBroadHQ(1.3), bambooHQ(), bambooHQ()] : [treeBroadHQ(0), treeBroadHQ(1.3), treeBroadHQ(2.2)];
+    const buckets = variants.map(() => []);
+    pos.forEach(p => buckets[Math.floor(rnd() * variants.length)].push(p));
+    variants.forEach((g, vi) => {
+      const im = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .92, vertexColors: true }), buckets[vi].length);
+      buckets[vi].forEach(([x, y, z, s], i) => { const k = s / 2.3; M.compose(new THREE.Vector3(x, y - .2, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, R(0, 6.28), 0)), new THREE.Vector3(k * R(.85, 1.15), k * R(.9, 1.25), k * R(.85, 1.15))); im.setMatrixAt(i, M); const v = R(.8, 1.12); im.setColorAt(i, c.setRGB(v * R(.92, 1.05), v, v * R(.85, 1))); });
+      im.castShadow = true; im.receiveShadow = true; grp.add(im);
+    });
+  }
+  scene.add(grp); return tag(grp, 'tree');
 }
 reg('trees_old', trees('old')); reg('trees_new', trees('new'));
 
@@ -752,6 +825,7 @@ const villa = new THREE.Group();
   const M = new THREE.Matrix4(), c = new THREE.Color();
   for (let i = 0; i < 2200; i++) { const x = R(-60, 60), z = R(-70, -12); M.makeTranslation(x, y0 + .35 + R(0, .3), z); fm.setMatrixAt(i, M); fm.setColorAt(i, rnd() < .72 ? c.set(0xf2c230) : c.set(0xf7f2e4)); void fl; }
   villa.add(fm);
+  tag(villa, 'house'); tag(fm, 'flower');
 }
 scene.add(villa); reg('villa', villa);
 
@@ -767,7 +841,7 @@ const ryotei = new THREE.Group();
     ryotei.add(new THREE.Mesh(box(w * .8, 1.1, .1, KSX + dx, y0 + 2.4, KSZ + dz + d / 2 + .06), lit));
   });
 }
-scene.add(ryotei); reg('ryotei', ryotei);
+scene.add(ryotei); reg('ryotei', ryotei); tag(ryotei, 'house');
 
 function sampan(scale = 1, lantern = true) {
   const g = new THREE.Group(), wood2 = new THREE.MeshStandardMaterial({ color: 0x3f3025, roughness: .9 });
@@ -786,7 +860,7 @@ const ferry = new THREE.Group(), ferryBoats = [];
   const f = riverFrame(-150, -70);
   for (let i = 0; i < 3; i++) { const b = sampan(1); ferry.add(b); ferryBoats.push({ b, ph: i * 2.1, off: -40 + i * 38, f }); }
 }
-scene.add(ferry); reg('ferry', ferry);
+scene.add(ferry); reg('ferry', ferry); tag(ferry, 'boat');
 
 const yakata = new THREE.Group(), yakataBoats = [];
 {
@@ -804,7 +878,7 @@ const yakata = new THREE.Group(), yakataBoats = [];
     yakata.add(g); yakataBoats.push({ g, f, s: -60 + i * 90 });
   }
 }
-scene.add(yakata); reg('yakata', yakata);
+scene.add(yakata); reg('yakata', yakata); tag(yakata, 'boat');
 
 const fireflies = (() => {
   const n = 260, p = new Float32Array(n * 3), base = [];
@@ -817,15 +891,79 @@ const fireflies = (() => {
 })();
 
 // ---------- traffic ----------
-function carGeo() { return merge([box(1.8, .75, 4.4, 0, .6, 0), box(1.62, .62, 2.3, 0, 1.28, -.2)]); }
-function busGeo() { return merge([box(2.5, 2.9, 11, 0, 1.8, 0)]); }
+const SKIN = [.84, .66, .52];
+function personHQ(shirt, pants, hat) {
+  const P = [], T = (g, c) => P.push(tint(g, ...c));
+  for (const x of [-.1, .1]) T(new THREE.CapsuleGeometry(.075, .72, 3, 8).translate(x, .45, 0), pants);
+  T(new THREE.CapsuleGeometry(.17, .42, 4, 10).scale(1.2, 1, .75).translate(0, 1.15, 0), shirt);
+  for (const sx of [-1, 1]) T(new THREE.CapsuleGeometry(.055, .55, 3, 6).rotateZ(sx * -.12).translate(sx * .29, 1.1, 0), shirt);
+  T(new THREE.SphereGeometry(.11, 12, 10).translate(0, 1.58, 0), SKIN);
+  if (hat) { T(new THREE.CylinderGeometry(.19, .19, .02, 14).translate(0, 1.67, 0), hat); T(new THREE.CylinderGeometry(.1, .11, .1, 12).translate(0, 1.72, 0), hat); }
+  return merge(P);
+}
+function riderHQ(shirt, pants, helmet, y = 0, z = 0) { // seated, leaning forward
+  const P = [], T = (g, c) => P.push(tint(g, ...c));
+  T(new THREE.CapsuleGeometry(.16, .38, 4, 10).scale(1.15, 1, .75).rotateX(.35).translate(0, y + .95, z), shirt);
+  for (const sx of [-1, 1]) { T(new THREE.CapsuleGeometry(.07, .42, 3, 6).rotateX(Math.PI / 2 - .3).translate(sx * .14, y + .62, z + .25), pants); T(new THREE.CapsuleGeometry(.065, .4, 3, 6).translate(sx * .14, y + .35, z + .45), pants); T(new THREE.CapsuleGeometry(.05, .45, 3, 6).rotateX(1.0).translate(sx * .26, y + 1.0, z + .3), shirt); }
+  T(new THREE.SphereGeometry(helmet ? .14 : .11, 12, 10).translate(0, y + 1.42, z + .15), helmet || SKIN);
+  return merge(P);
+}
+function wheelHQ(r, w, x, y, z, c = [.07, .07, .07]) { const g = new THREE.CylinderGeometry(r, r, w, 16); g.rotateZ(Math.PI / 2); g.translate(x, y, z); return tint(g, ...c); }
+function carHQ() {
+  const sh = new THREE.Shape(), pr = [[-2.25, .32], [-2.28, .72], [-1.95, .86], [-1.25, .92], [-.85, 1.38], [.45, 1.42], [1.15, .96], [2.15, .82], [2.28, .5], [2.2, .3]];
+  sh.moveTo(...pr[0]); pr.slice(1).forEach(p => sh.lineTo(...p)); sh.lineTo(-2.25, .32);
+  const body = new THREE.ExtrudeGeometry(sh, { depth: 1.66, bevelEnabled: true, bevelSize: .06, bevelThickness: .06, bevelSegments: 2 }); body.translate(0, 0, -.83); body.rotateY(-Math.PI / 2);
+  const gs = new THREE.Shape(); [[-1.15, .95], [-.8, 1.33], [.42, 1.37], [1.02, .97]].forEach((p, i) => i ? gs.lineTo(...p) : gs.moveTo(...p)); gs.lineTo(-1.15, .95);
+  const glass = new THREE.ExtrudeGeometry(gs, { depth: 1.7, bevelEnabled: false }); glass.translate(0, 0, -.85); glass.rotateY(-Math.PI / 2);
+  const P = [tint(body, 1, 1, 1), tint(glass, .1, .12, .14)];
+  for (const x of [-.8, .8]) for (const z of [-1.4, 1.35]) P.push(wheelHQ(.33, .24, x, .33, z));
+  P.push(tint(box(1.5, .12, .06, 0, .5, 2.3), .15, .15, .15), tint(box(1.5, .12, .06, 0, .55, -2.3), .6, .1, .08));
+  return merge(P);
+}
+function busHQ() {
+  const P = [tint(box(2.5, 2.7, 11, 0, 1.75, 0), 1, 1, 1), tint(box(2.54, .95, 9.6, 0, 2.3, -.3), .1, .12, .14), tint(box(2.3, 1.3, .06, 0, 2.1, 5.51), .1, .12, .14), tint(box(2.3, .25, 10.4, 0, 3.2, 0), .8, .8, .8)];
+  for (const x of [-1.1, 1.1]) for (const z of [-3.6, 3.4]) P.push(wheelHQ(.5, .35, x, .5, z));
+  return merge(P);
+}
+function scooterHQ(shirt, pants, helmet, bc = [1, 1, 1]) {
+  const P = [wheelHQ(.26, .12, 0, .26, .62), wheelHQ(.26, .12, 0, .26, -.62)];
+  P.push(tint(box(.46, .1, .62, 0, .36, .05), ...bc), tint(box(.5, .85, .12, 0, .78, .55).rotateX(-.25), ...bc));
+  P.push(tint(new THREE.CapsuleGeometry(.22, .45, 4, 10).rotateX(Math.PI / 2).translate(0, .58, -.45), ...bc), tint(box(.3, .1, .6, 0, .83, -.35), .1, .1, .1));
+  P.push(tint(box(.7, .05, .05, 0, 1.18, .55), .2, .2, .2));
+  P.push(riderHQ(shirt, pants, helmet, .15, -.45));
+  return merge(P);
+}
+function car37HQ() {
+  const P = [tint(box(1.55, .5, 3.8, 0, .78, 0), 1, 1, 1), tint(box(1.45, 1.0, 2.0, 0, 1.52, -.4), 1, 1, 1), tint(box(1.05, .55, 1.35, 0, 1.08, 1.25), 1, 1, 1)];
+  P.push(tint(box(1.48, .5, 1.85, 0, 1.62, -.35), .1, .1, .12));
+  for (const x of [-.78, .78]) { P.push(tint(box(.22, .06, 2.0, x * 1.05, .55, .1), .2, .2, .2)); for (const z of [-1.3, 1.25]) { const f = new THREE.CylinderGeometry(.46, .46, .3, 12, 1, false, 0, Math.PI); f.rotateZ(Math.PI / 2); f.rotateX(Math.PI / 2); f.translate(x, .45, z); P.push(tint(f, 1, 1, 1), wheelHQ(.38, .16, x, .38, z, [.06, .06, .06])); } }
+  for (const x of [-.4, .4]) P.push(tint(new THREE.SphereGeometry(.11, 10, 8).translate(x, 1.2, 1.95), .9, .9, .85));
+  P.push(tint(cyl(.35, .35, .15, 0, 1.0, -2.0, 12).rotateX(Math.PI / 2), .1, .1, .1));
+  return merge(P);
+}
+function bikeHQ(shirt, pants, hat) {
+  const P = [];
+  for (const z of [-.52, .52]) { const t = new THREE.TorusGeometry(.33, .025, 6, 20); t.rotateY(Math.PI / 2); t.translate(0, .35, z); P.push(tint(t, .08, .08, .08)); }
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  [[V(0, .35, -.52), V(0, .75, -.1)], [V(0, .75, -.1), V(0, .8, .42)], [V(0, .35, .52), V(0, .8, .42)], [V(0, .35, -.52), V(0, .38, 0)], [V(0, .38, 0), V(0, .75, -.1)], [V(0, .8, .42), V(0, 1.05, .38)]].forEach(([a, b]) => P.push(tint(rod(a, b, .02, 5), .15, .15, .15)));
+  P.push(tint(box(.5, .04, .04, 0, 1.05, .38), .15, .15, .15));
+  P.push(riderHQ(shirt, pants, hat, -.05, -.15));
+  return merge(P);
+}
+function carGeo() { return HQ ? carHQ() : merge([box(1.8, .75, 4.4, 0, .6, 0), box(1.62, .62, 2.3, 0, 1.28, -.2)]); }
+function busGeo() { return HQ ? busHQ() : merge([box(2.5, 2.9, 11, 0, 1.8, 0)]); }
 function scooterGeo() { return merge([box(.6, .7, 1.8, 0, .55, 0), cyl(.24, .26, .75, 0, .95, -.2, 6), new THREE.SphereGeometry(.2, 8, 6).translate(0, 1.95, -.2)]); }
-function car37Geo() { return merge([box(1.65, .8, 3.9, 0, .75, 0), box(1.5, .9, 1.9, 0, 1.55, -.3), box(1.9, .1, 3.2, 0, .45, 0)]); }
+function car37Geo() { return HQ ? car37HQ() : merge([box(1.65, .8, 3.9, 0, .75, 0), box(1.5, .9, 1.9, 0, 1.55, -.3), box(1.9, .1, 3.2, 0, .45, 0)]); }
 function personGeo() { return merge([new THREE.CapsuleGeometry(.22, .95, 3, 8).translate(0, .8, 0), new THREE.SphereGeometry(.17, 8, 6).translate(0, 1.62, 0)]); }
 function bikeGeo() { return merge([box(.12, .9, 1.7, 0, .45, 0), new THREE.CapsuleGeometry(.2, .7, 3, 8).translate(0, 1.35, -.1), new THREE.SphereGeometry(.16, 8, 6).translate(0, 1.95, -.1)]); }
-class Traffic {
+// HQ crowds: several outfit variants, each its own instanced set (vertex colours carry the outfit)
+const OUTFIT = {
+  old: [[[.92, .9, .84], [.25, .24, .22], [.85, .8, .65]], [[.2, .2, .22], [.2, .2, .22], [.15, .15, .15]], [[.55, .6, .7], [.55, .6, .7], null], [[.75, .68, .55], [.3, .28, .25], null]],
+  new: [[[.85, .85, .85], [.2, .25, .4], null], [[.7, .2, .2], [.25, .25, .28], null], [[.2, .35, .55], [.8, .75, .65], null], [[.15, .15, .15], [.15, .15, .15], null], [[.9, .75, .3], [.3, .3, .32], null]],
+  mid: [[[.9, .9, .88], [.25, .27, .35], [.9, .85, .2]], [[.55, .35, .25], [.2, .2, .25], [.85, .1, .1]], [[.3, .45, .6], [.3, .3, .3], [.95, .95, .95]], [[.8, .7, .55], [.25, .22, .2], [.2, .3, .7]]]
+};class Traffic {
   constructor(parent, geo, colors, lanes, n, speed, headlights = false) {
-    this.im = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .45, metalness: .3 }), n);
+    this.im = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .45, metalness: .3, vertexColors: !!geo.attributes.color }), n);
     this.im.castShadow = true; this.im.frustumCulled = false;
     this.items = []; const c = new THREE.Color();
     for (let i = 0; i < n; i++) { const ln = lanes[i % lanes.length]; this.items.push({ ln, s: R(ln.z0, ln.z1), v: speed * R(.75, 1.2) }); this.im.setColorAt(i, c.set(colors[i % colors.length])); }
@@ -851,37 +989,44 @@ class Traffic {
   }
 }
 const TR = {};
+// in HQ each outfit variant becomes its own instanced set; the live page keeps one light set
+function crowd(parent, liveGeo, hqGeo, era, liveColors, lanes, n, speed) {
+  if (!HQ) return [new Traffic(parent, liveGeo, liveColors, lanes, n, speed)];
+  const outfits = OUTFIT[era];
+  return outfits.map((o, i) => new Traffic(parent, hqGeo(o, i), [0xffffff], lanes, Math.max(1, Math.round(n / outfits.length)), speed));
+}
+const SCOOTER_BODY = [[.8, .15, .12], [.15, .35, .65], [.92, .78, .2], [.9, .9, .88], [.2, .55, .3]];
 const carCols = [0xe9e9e9, 0x1c1c1f, 0xb5b8bb, 0x8a1d1d, 0x21477a, 0xd9c541, 0x4d5a4f];
 {
   const g37 = new THREE.Group(); kbTop.add(g37);
   TR.t37 = [
     new Traffic(g37, car37Geo(), [0x222222, 0x2e3a2c, 0x3b2a24], [{ x: 1.3, y: Y_DECK, dir: 1, z0: -150, z1: 150 }, { x: -1.3, y: Y_DECK, dir: -1, z0: -150, z1: 150 }], 5, 6),
-    new Traffic(g37, bikeGeo(), [0x2a2622, 0x3a3027], [{ x: 2.2, y: Y_DECK, dir: 1, z0: -150, z1: 150 }, { x: -2.2, y: Y_DECK, dir: -1, z0: -150, z1: 150 }], 14, 2.8),
-    new Traffic(g37, personGeo(), [0x4a4138, 0x2b2c33, 0xd8d2c4], [{ x: 2.45, y: Y_DECK, dir: 1, z0: -150, z1: 150 }, { x: -2.45, y: Y_DECK, dir: -1, z0: -150, z1: 150 }], 22, 1.2)
+    ...crowd(g37, bikeGeo(), o => bikeHQ(...o), 'old', [0x2a2622, 0x3a3027], [{ x: 2.2, y: Y_DECK, dir: 1, z0: -150, z1: 150 }, { x: -2.2, y: Y_DECK, dir: -1, z0: -150, z1: 150 }], 14, 2.8),
+    ...crowd(g37, personGeo(), o => personHQ(...o), 'old', [0x4a4138, 0x2b2c33, 0xd8d2c4], [{ x: 2.45, y: Y_DECK, dir: 1, z0: -150, z1: 150 }, { x: -2.45, y: Y_DECK, dir: -1, z0: -150, z1: 150 }], 22, 1.2)
   ];
-  reg('traffic37', g37);
+  reg('traffic37', g37); tag(g37, 'vehicle'); TR.t37.slice(1).forEach(t => tag(t.im, 'person'));
   const g70 = new THREE.Group(); scene.add(g70);
   const lanes70 = []; for (const [x, dir] of [[-10.2, -1], [-6.8, -1], [-3.4, -1], [3.4, 1], [6.8, 1], [10.2, 1]]) lanes70.push({ x, y: Y_DECK + .27, dir, z0: -250, z1: 252 });
   TR.t70 = [
     new Traffic(g70, carGeo(), carCols, lanes70.slice(1, 5), 60, 11, true),
     new Traffic(g70, busGeo(), [0x2f5f9a, 0xd8d2c4, 0x3f8a4a], [lanes70[2], lanes70[3]], 6, 9, true),
-    new Traffic(g70, scooterGeo(), [0xc0392b, 0x2471a3, 0xf1c40f, 0xecf0f1, 0x27ae60], [lanes70[0], lanes70[5], { ...lanes70[0], x: -11.4 }, { ...lanes70[5], x: 11.4 }], 220, 10)
+    ...crowd(g70, scooterGeo(), (o, i) => scooterHQ(o[0], o[1], o[2], SCOOTER_BODY[i % 5]), 'mid', [0xc0392b, 0x2471a3, 0xf1c40f, 0xecf0f1, 0x27ae60], [lanes70[0], lanes70[5], { ...lanes70[0], x: -11.4 }, { ...lanes70[5], x: 11.4 }], 220, 10)
   ];
-  reg('traffic70', g70);
+  reg('traffic70', g70); tag(g70, 'vehicle');
   const gN = new THREE.Group(); scene.add(gN);
   const lanesN = []; for (const [dx, dir] of [[-9.6, -1], [-5.7, -1], [-1.9, -1], [1.9, 1], [5.7, 1], [9.6, 1]]) lanesN.push({ x: X0 + dx, y: NB_Y + .05, dir, z0: -260, z1: 260 });
   TR.tn = [
     new Traffic(gN, carGeo(), carCols, lanesN.slice(1, 5), 56, 13, true),
     new Traffic(gN, busGeo(), [0x2f5f9a, 0xe6e2d6], [lanesN[2], lanesN[3]], 4, 11, true),
-    new Traffic(gN, scooterGeo(), [0xc0392b, 0x2471a3, 0xf1c40f, 0xecf0f1, 0x27ae60, 0x222222], [lanesN[0], lanesN[5]], 90, 11)
+    ...crowd(gN, scooterGeo(), (o, i) => scooterHQ(o[0], o[1], [.9, .9, .9], SCOOTER_BODY[i % 5]), 'new', [0xc0392b, 0x2471a3, 0xf1c40f, 0xecf0f1, 0x27ae60, 0x222222], [lanesN[0], lanesN[5]], 90, 11)
   ];
-  reg('trafficNew', gN);
+  reg('trafficNew', gN); tag(gN, 'vehicle');
   const gP = new THREE.Group(); kbTop.add(gP);
   TR.people = [
-    new Traffic(gP, personGeo(), [0x2b2c33, 0x6b2f2f, 0xd8d2c4, 0x2f4f6b, 0x4a4138], [{ x: -1.6, y: Y_DECK + .1, dir: 1, z0: -150, z1: 150 }, { x: -.4, y: Y_DECK + .1, dir: -1, z0: -150, z1: 150 }, { x: 1.0, y: Y_DECK + .1, dir: 1, z0: -150, z1: 150 }], 70, 1.15),
-    new Traffic(gP, bikeGeo(), [0x2a2622, 0x6b2f2f, 0x2f4f6b], [{ x: 1.9, y: Y_DECK + .1, dir: -1, z0: -150, z1: 150 }], 8, 3.6)
+    ...crowd(gP, personGeo(), o => personHQ(...o), 'new', [0x2b2c33, 0x6b2f2f, 0xd8d2c4, 0x2f4f6b, 0x4a4138], [{ x: -1.6, y: Y_DECK + .1, dir: 1, z0: -150, z1: 150 }, { x: -.4, y: Y_DECK + .1, dir: -1, z0: -150, z1: 150 }, { x: 1.0, y: Y_DECK + .1, dir: 1, z0: -150, z1: 150 }], 70, 1.15),
+    ...crowd(gP, bikeGeo(), o => bikeHQ(o[0], o[1], null), 'new', [0x2a2622, 0x6b2f2f, 0x2f4f6b], [{ x: 1.9, y: Y_DECK + .1, dir: -1, z0: -150, z1: 150 }], 8, 3.6)
   ];
-  reg('people', gP);
+  reg('people', gP); tag(gP, 'person');
 }
 
 // ---------- labels ----------
@@ -1115,6 +1260,13 @@ const waterMaskMat = new THREE.ShaderMaterial({
   vertexShader: depthMat.vertexShader.replace('varying float vD;', 'varying float vD; varying float vY;').replace('mv = modelViewMatrix * mv;', 'vY = (modelMatrix * mv).y; mv = modelViewMatrix * mv;'),
   fragmentShader: 'varying float vY; void main(){ gl_FragColor = vec4(vec3(abs(vY) < 0.05 ? 1.0 : 0.0), 1.0); }'
 });
+const CAT_COLOR = { person: [1, 0, 0], vehicle: [0, 1, 0], tree: [0, 0, 1], house: [1, 1, 0], building: [0, 1, 1], boat: [1, 0, 1], farm: [.5, 0, 1], flower: [1, .5, 0] };
+const idMats = {};
+function idMat(cat) {
+  const c = CAT_COLOR[cat] || [0, 0, 0], key = cat || 'none';
+  if (!idMats[key]) idMats[key] = new THREE.ShaderMaterial({ vertexShader: depthMat.vertexShader, fragmentShader: `void main(){ gl_FragColor = vec4(${c.map(v => v.toFixed(3)).join(',')}, 1.0); }`, side: THREE.DoubleSide });
+  return idMats[key];
+}
 function renderPasses(W = 1920, H = 1080) {
   const prevSize = new THREE.Vector2(); renderer.getSize(prevSize); const prevPR = renderer.getPixelRatio();
   renderer.setPixelRatio(1); renderer.setSize(W, H, false); composer.setSize(W, H);
@@ -1129,6 +1281,15 @@ function renderPasses(W = 1920, H = 1080) {
   scene.overrideMaterial = depthMat; renderer.render(scene, camera); out.depth = canvas.toDataURL('image/png');
   scene.overrideMaterial = null;
   scene.overrideMaterial = waterMaskMat; renderer.render(scene, camera); out.water = canvas.toDataURL('image/png'); scene.overrideMaterial = null;
+  { // category ids for the detail pass
+    const saved = [], hidden = [];
+    scene.traverse(o => {
+      if (o === sky || o === nightDome || o.isPoints || o.isSprite) { if (o.visible) { hidden.push(o); o.visible = false; } return; }
+      if (o.isMesh) { saved.push([o, o.material]); o.material = idMat(o === water ? null : o.userData.cat); }
+    });
+    renderer.render(scene, camera); out.ids = canvas.toDataURL('image/png');
+    saved.forEach(([o, m]) => o.material = m); hidden.forEach(o => o.visible = true);
+  }
   water.onBeforeRender = wob;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; scene.background = bg; scene.fog = fog; hide.forEach((o, i) => o.visible = vis[i]);
   out.labels = LABELS.filter(L => L.on).map(L => { const v = L.v.clone().project(camera); return { t: L.t, s: L.s, warn: !!L.warn, x: +((v.x + 1) / 2).toFixed(4), y: +((1 - v.y) / 2).toFixed(4), z: v.z }; }).filter(l => l.z < 1 && l.x > -0.05 && l.x < 1.05 && l.y > -0.05 && l.y < 1.05);
