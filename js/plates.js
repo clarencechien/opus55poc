@@ -145,12 +145,17 @@ void main(){
   // ---------- assets ----------
   const loader = new THREE.TextureLoader();
   const cache = new Map();
-  function tex(url, color) {
+  async function tex(url, color) {
+    for (let i = 0; ; i++) { // retry transient network failures
+      try { return await tex1(url, color); } catch (e) { if (i >= 2) throw e; await new Promise(r => setTimeout(r, 600 * (i + 1))); }
+    }
+  }
+  function tex1(url, color) {
     return new Promise((res, rej) => loader.load(url, t => { t.colorSpace = THREE.NoColorSpace; void color; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; res(t); }, undefined, rej));
   }
   function plate(scene) {
     const m = manifest[scene]; if (!m) return Promise.reject(new Error('no plate ' + scene));
-    if (!cache.has(scene)) cache.set(scene, Promise.all([tex(BASE + m.id + '.jpg', true), tex(BASE + m.id + '_d.png'), tex(BASE + m.id + '_w.png')]).then(([t, d, w]) => ({ t, d, w, m })));
+    if (!cache.has(scene)) cache.set(scene, Promise.all([tex(BASE + m.id + '.jpg', true), tex(BASE + m.id + '_d.png'), tex(BASE + m.id + '_w.png')]).then(([t, d, w]) => ({ t, d, w, m })).catch(e => { cache.delete(scene); throw e; }));
     return cache.get(scene);
   }
   const order = [...document.querySelectorAll('.step')].map(s => s.dataset.scene);
@@ -181,7 +186,15 @@ void main(){
   async function go(scene) {
     want = scene; if (busy || scene === cur || !manifest[scene]) return;
     busy = true;
-    let P; try { P = await plate(scene); } catch (e) { busy = false; return; }
+    let P; try { P = await plate(scene); } catch (e) {
+      busy = false;
+      if (cur === null) { // could not load even the first plate: hand over to the live 3D scene
+        canvas.remove(); labelsEl.remove(); document.body.classList.remove('plate-mode'); document.body.classList.add('live-mode');
+        if (hv) hv.textContent = '3D 重建・依史料尺寸建模';
+        await loadLive(); live.setScene(want || scene, true);
+      } else if (want !== cur) setTimeout(() => go(want), 1500);
+      return;
+    }
     if (cur === null) {
       Object.assign(U.tA, { value: P.t }); U.dA.value = P.d; U.wA.value = P.w; U.uEraA.value = ERA[P.m.era]; U.uNightA.value = TOD[P.m.time];
       cur = scene; busy = false; loading?.classList.add('done'); showLabels(P.m.labels); prefetch(scene); return;

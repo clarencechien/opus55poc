@@ -965,7 +965,11 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 const skyScene = new THREE.Scene(); const skyForEnv = new Sky(); skyForEnv.scale.setScalar(1000); skyScene.add(skyForEnv);
 let envRT = null, envTimer = 0;
 function updateEnv() {
-  for (const k of ['turbidity', 'rayleigh', 'mieCoefficient', 'mieDirectionalG', 'sunPosition']) skyForEnv.material.uniforms[k].value = SU[k].value;
+  for (const k of ['turbidity', 'rayleigh', 'mieCoefficient', 'mieDirectionalG']) skyForEnv.material.uniforms[k].value = SU[k].value;
+  // a sun below the horizon makes the sky shader return invalid values that blacken the whole PMREM; keep it just above
+  const sp = SU.sunPosition.value.clone().normalize(); const minY = Math.sin(THREE.MathUtils.degToRad(2));
+  if (sp.y < minY) { const h = Math.hypot(sp.x, sp.z) || 1; sp.set(sp.x / h * Math.cos(Math.asin(minY)), minY, sp.z / h * Math.cos(Math.asin(minY))); }
+  skyForEnv.material.uniforms.sunPosition.value.copy(sp);
   if (envRT) envRT.dispose();
   envRT = pmrem.fromScene(skyScene, 0, 1, 2000);
   scene.environment = envRT.texture;
