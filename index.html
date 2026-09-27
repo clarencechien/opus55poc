@@ -88,6 +88,11 @@ h1,h2,h3{font-family:var(--serif);font-weight:900;letter-spacing:.02em;line-heig
 /* ---------- 3D stage ---------- */
 #gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
 #labels{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:hidden}
+#plate{position:absolute;inset:0;width:100%;height:100%;display:block}
+#plabels{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:hidden;transition:opacity .6s}
+body.plate-mode #gl,body.plate-mode #labels{display:none}
+body.plate-mode.exploring #gl,body.plate-mode.exploring #labels{display:block}
+body.exploring #plate,body.exploring #plabels{display:none}
 .lbl{position:absolute;left:0;top:0;transition:opacity .5s;white-space:nowrap;font-size:12px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.9);will-change:transform}
 .lbl b{display:block;font-family:var(--serif);font-size:16px;letter-spacing:.12em;transform:translate(-50%,-100%);position:absolute;left:0;bottom:4px;padding-bottom:6px}
 .lbl span{position:absolute;left:0;top:-4px;transform:translate(-50%,0);color:rgba(255,255,255,.75);font-size:11.5px;letter-spacing:.05em}
@@ -225,7 +230,7 @@ footer{text-align:center;padding:40px 6vw 60px;color:var(--muted);font-size:13px
   <div class="stage">
     <canvas id="gl" aria-label="川端橋與新中正橋的3D場景" role="img"></canvas>
     <div id="labels" aria-hidden="true"></div>
-    <div class="hud" aria-hidden="true"><div class="hud-era" id="hudEra">修復啟用</div><div class="hud-year" id="hudYear">2026</div><div class="hud-view">3D 重建・依史料尺寸建模</div></div>
+    <div class="hud" aria-hidden="true"><div class="hud-era" id="hudEra">修復啟用</div><div class="hud-year" id="hudYear">2026</div><div class="hud-view" id="hudView">3D 重建・依史料尺寸建模</div></div>
     <button type="button" class="explore" id="exploreBtn" aria-pressed="false">自由探索 3D</button>
     <div class="loading" id="loading"><i></i>正在建構新店溪與川端橋的3D場景…</div>
   </div>
@@ -515,6 +520,6 @@ footer{text-align:center;padding:40px 6vw 60px;color:var(--muted);font-size:13px
 
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 <script src="js/page.js"></script>
-<script type="module" src="js/scene3d.js"></script>
+<script type="module" src="js/plates.js"></script>
 </body>
 </html>

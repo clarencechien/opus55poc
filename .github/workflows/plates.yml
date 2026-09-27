@@ -1,0 +1,58 @@
+name: Bake cinematic plates (Modal)
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Comma-separated plate ids (blank = all)"
+        required: false
+        default: ""
+      variants:
+        description: "Variants per plate"
+        required: false
+        default: "2"
+  push:
+    paths:
+      - "plates/prompts.json"
+      - "plates/modal_plates.py"
+      - "plates/passes/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: plates-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install modal
+      - name: Check Modal credentials
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+        run: |
+          if [ -z "$MODAL_TOKEN_ID" ]; then
+            echo "::error::Add MODAL_TOKEN_ID and MODAL_TOKEN_SECRET under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+      - name: Paint plates on Modal
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: modal run plates/modal_plates.py --only "${{ inputs.only }}" --variants "${{ inputs.variants || '2' }}"
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plates/raw
+          git diff --cached --quiet && { echo "No new plates"; exit 0; }
+          git commit -m "Bake cinematic plates on Modal"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

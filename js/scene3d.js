@@ -988,16 +988,13 @@ const controls = new OrbitControls(camera, canvas);
 canvas.style.touchAction = 'pan-y'; // OrbitControls sets 'none', which would block page scrolling on phones
 controls.enabled = false; controls.enableDamping = true; controls.maxPolarAngle = Math.PI * .495; controls.minDistance = 8; controls.maxDistance = 3000;
 const exploreBtn = document.getElementById('exploreBtn');
-exploreBtn?.addEventListener('click', () => {
-  const on = !document.body.classList.contains('exploring');
+function setExplore(on) {
   document.body.classList.toggle('exploring', on);
-  exploreBtn.textContent = on ? '結束自由探索' : '自由探索 3D';
-  exploreBtn.setAttribute('aria-pressed', String(on));
+  if (exploreBtn) { exploreBtn.textContent = on ? '結束自由探索' : '自由探索 3D'; exploreBtn.setAttribute('aria-pressed', String(on)); }
   controls.enabled = on; canvas.style.touchAction = on ? 'none' : 'pan-y';
   if (on) { controls.target.copy(camNow.t); camera.clearViewOffset(); camera.updateProjectionMatrix(); }
-  else { resize(); }
   requestAnimationFrame(resize);
-});
+}
 
 // ---------- loop ----------
 let last = performance.now(), running = true, visible = true;
@@ -1010,7 +1007,8 @@ function frame(now) {
   const rawDt = (now - last) / 1000;
   const dt = Math.min(.05, rawDt); last = now;
   if (!degraded && visible) { slowFrames = rawDt > .045 ? slowFrames + 1 : Math.max(0, slowFrames - 1); if (slowFrames > 90) { degraded = true; renderer.setPixelRatio(1); renderer.shadowMap.enabled = false; resize(); } }
-  if (!visible && !document.body.classList.contains('exploring')) return;
+  const exploring = document.body.classList.contains('exploring');
+  if ((!visible || document.body.classList.contains('plate-mode')) && !exploring) return;
   const k = reduce ? 1 : 1 - Math.exp(-dt * 1.7), kf = reduce ? 1 : 1 - Math.exp(-dt * 2.6);
   // time of day
   const prevEl = tState.el; lerpT(tState, tGoal, k);
@@ -1094,4 +1092,43 @@ setScene(window.__scene || 'reopen');
 updateEnv();
 requestAnimationFrame(t => { last = t; frame(t); });
 setTimeout(() => loading?.classList.add('done'), 300);
-window.__kb3d = { scene, camera, ALL, setScene, renderer };
+// ---------- offline passes (used to bake the cinematic plates; not used by the live page) ----------
+const depthMat = new THREE.ShaderMaterial({
+  vertexShader: `#include <common>
+#include <morphtarget_pars_vertex>
+varying float vD;
+void main(){
+  #include <begin_vertex>
+  #include <morphtarget_vertex>
+  vec4 mv = vec4(transformed, 1.0);
+  #ifdef USE_INSTANCING
+  mv = instanceMatrix * mv;
+  #endif
+  mv = modelViewMatrix * mv; vD = -mv.z; gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `varying float vD; void main(){ float v = 1.0 - log(max(vD,3.0)/3.0)/log(8000.0/3.0); gl_FragColor = vec4(vec3(clamp(v,0.0,1.0)),1.0); }`
+});
+const waterMaskMat = new THREE.ShaderMaterial({
+  vertexShader: depthMat.vertexShader.replace('varying float vD;', 'varying float vD; varying float vY;').replace('mv = modelViewMatrix * mv;', 'vY = (modelMatrix * mv).y; mv = modelViewMatrix * mv;'),
+  fragmentShader: 'varying float vY; void main(){ gl_FragColor = vec4(vec3(abs(vY) < 0.05 ? 1.0 : 0.0), 1.0); }'
+});
+function renderPasses(W = 1920, H = 1080) {
+  const prevSize = new THREE.Vector2(); renderer.getSize(prevSize); const prevPR = renderer.getPixelRatio();
+  renderer.setPixelRatio(1); renderer.setSize(W, H, false); composer.setSize(W, H);
+  camera.aspect = W / H; camera.fov = 40; camera.setViewOffset(W, H, -W * .17, 0, W, H); camera.updateProjectionMatrix();
+  camera.position.copy(camNow.p); camera.lookAt(camNow.t); camera.updateMatrixWorld();
+  const out = {};
+  composer.render(); out.beauty = canvas.toDataURL('image/png');
+  const hide = [stars, moon, nightDome, sky, fireflies]; const vis = hide.map(o => o.visible); hide.forEach(o => o.visible = false);
+  const bg = scene.background, fog = scene.fog; scene.background = new THREE.Color(0); scene.fog = null;
+  renderer.toneMapping = THREE.NoToneMapping;
+  const wob = water.onBeforeRender; water.onBeforeRender = () => {};
+  scene.overrideMaterial = depthMat; renderer.render(scene, camera); out.depth = canvas.toDataURL('image/png');
+  scene.overrideMaterial = null;
+  scene.overrideMaterial = waterMaskMat; renderer.render(scene, camera); out.water = canvas.toDataURL('image/png'); scene.overrideMaterial = null;
+  water.onBeforeRender = wob;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; scene.background = bg; scene.fog = fog; hide.forEach((o, i) => o.visible = vis[i]);
+  out.labels = LABELS.filter(L => L.on).map(L => { const v = L.v.clone().project(camera); return { t: L.t, s: L.s, warn: !!L.warn, x: +((v.x + 1) / 2).toFixed(4), y: +((1 - v.y) / 2).toFixed(4), z: v.z }; }).filter(l => l.z < 1 && l.x > -0.05 && l.x < 1.05 && l.y > -0.05 && l.y < 1.05);
+  renderer.setPixelRatio(prevPR); renderer.setSize(prevSize.x, prevSize.y, false); resize();
+  return out;
+}
+window.__kb3d = { scene, camera, ALL, setScene, renderer, renderPasses, setExplore };
