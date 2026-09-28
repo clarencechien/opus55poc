@@ -176,3 +176,47 @@ def main(only: str = "", variants: int = 2, detail: bool = False):
     for (pid, v, _), img in zip(jobs, painter.paint.starmap([j[2] for j in jobs])):
         (out / f"{pid}_v{v}.jpg").write_bytes(img)
         print("wrote", pid, v, len(img))
+
+
+POLISH = {
+    "open": ("old", "opening day in 1937 of a long low concrete bridge on twin-column arched piers with green riveted steel girders "
+                    "across a wide calm river, small red and white flags along the railing, pedestrians on the deck, wooden sampan "
+                    "ferry boats on the water, grassy riverbank, fields with trees and low tiled-roof houses, summer clouds"),
+    "reopen": ("new", "night in Taipei, a restored 1937 concrete pedestrian bridge on twin-column arched piers lit by warm uplights, "
+                      "warm LED strip along its railing, beside a large pale mint-green open-web steel arch road bridge with thin cables "
+                      "and a white LED line along the arch, street lamps, dense apartment towers with lit windows, calm river with long "
+                      "reflections, starry sky, long exposure"),
+}
+
+
+@app.local_entrypoint()
+def polish(shots: str = "open,reopen", bridge: float = 0.26, scene: float = 0.5, cn: float = 0.85, edge: float = 0.6):
+    """AI polish over Blender Cycles renders (render/out/<shot>.png, _depth0001.png, _mask0001.png).
+    Two img2img passes under depth + canny control: a gentle one kept on the bridges (mask) so the modelled
+    structure survives, a stronger one everywhere else (city, banks, sky, water) for photographic texture."""
+    import numpy as np
+    from PIL import Image, ImageFilter
+    spec = json.loads((ROOT / "prompts.json").read_text())
+    rdir = ROOT.parent / "render" / "out"
+    jobs = []
+    for shot in [s.strip() for s in shots.split(",") if s.strip()]:
+        era, body = POLISH[shot]
+        prompt = f"{body}, {spec['eras'][era]['style']}"
+        negative = spec["negative"] + (", " + spec["eras"][era]["negative"] if spec["eras"][era].get("negative") else "")
+        buf = io.BytesIO(); Image.open(rdir / f"{shot}.png").convert("RGB").save(buf, "PNG"); beauty = buf.getvalue()
+        d = np.asarray(Image.open(rdir / f"{shot}_depth0001.png")).astype(np.float32) / 65535 * 255
+        buf = io.BytesIO(); Image.fromarray(d.astype(np.uint8)).convert("RGB").save(buf, "PNG"); depth = buf.getvalue()
+        seed = 1937 + sum(map(ord, shot))
+        for tag, st in (("bridge", bridge), ("scene", scene)):
+            jobs.append(((shot, tag), (beauty, depth, prompt, negative, st, cn, edge, seed)))
+    out = {}
+    for (key, _), img in zip(jobs, Painter().paint.starmap([j[1] for j in jobs])):
+        out[key] = Image.open(io.BytesIO(img)).convert("RGB")
+        out[key].save(rdir / f"{key[0]}_polish_{key[1]}.jpg", quality=92)
+    for shot in {k[0] for k in out}:
+        m16 = np.asarray(Image.open(rdir / f"{shot}_mask0001.png")).astype(np.float32)
+        m = Image.fromarray((m16 / m16.max() * 255 if m16.max() > 0 else m16).astype(np.uint8)).resize((1920, 1080))
+        m = m.filter(ImageFilter.MaxFilter(5)).filter(ImageFilter.GaussianBlur(3))
+        final = Image.composite(out[(shot, "bridge")], out[(shot, "scene")], m)
+        final.save(rdir / f"{shot}_polished.jpg", quality=92)
+        print("wrote", shot, "polished")
