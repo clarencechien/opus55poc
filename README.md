@@ -10,6 +10,9 @@
 - `plates/selection.json` — 每章採用的 AI 版本；`python plates/tools.py web` 依此產出 `plates/web/`
 - `plates/` — 畫面烘焙流程：`passes/`（three.js 輸出的成品圖、深度、水面遮罩）、`prompts.json`（各章提示詞）、`modal_plates.py`（Modal GPU：RealVisXL＋SDXL depth ControlNet img2img）、`tools.py`（前後處理）、`web/`（網頁用素材與 manifest）
 - `.github/workflows/plates.yml` — （選用，手動觸發）在 GitHub Actions 上呼叫 Modal 生成畫面；需 repo secrets `MODAL_TOKEN_ID`、`MODAL_TOKEN_SECRET`。本機或雲端沙箱直接執行即可：`pip install 'modal[api-proxy-support]'` 後 `modal run plates/modal_plates.py`（有 HTTP proxy 的環境必須裝 `api-proxy-support`）
+- `render/` — Blender Cycles 路徑追蹤流程（做法參考 pirrer/meiji-bridge-3d，MIT）：`kawabata_scene.py` 以 Poly Haven CC0 PBR 材質、HDRI 天空、真實光源重建場景，`modal_render.py` 在 Modal L40S 上以無頭 Blender 4.2 LTS 渲染
+  - 靜態樣張：`modal run render/modal_render.py --shots open,reopen` → `render/out/`；`render/samples/` 為成品
+  - 紀錄片試片（1935–1937 建橋，25 秒、30 fps）：`modal run render/modal_render.py::anim --clip build` 將 750 格分 10 段平行渲染到 Modal Volume，再加中文字幕、淡入淡出並以 H.264 編碼成 `render/out/pilot_build.mp4`；`--probe 60,300,700 --res 960x540 --samples 48` 只渲染幾格快速檢查
 - `assets/waternormals.jpg` — 水面法線貼圖（three.js 範例素材，MIT）
 
 ## 部署（GitHub Pages）
