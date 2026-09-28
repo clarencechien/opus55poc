@@ -1,0 +1,149 @@
+{
+ "variant": "empty",
+ "lightmaps": {
+  "BAKE_arch": {
+   "file": "lm_arch.jpg",
+   "intensity": 7.1902154789066985,
+   "size": 4096
+  }
+ },
+ "materials": {
+  "alu": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.05,
+    0.05,
+    0.055
+   ],
+   "rough": 0.35,
+   "metal": 0.8
+  },
+  "balcony": {
+   "type": "baked",
+   "map": "tex/balcony.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0
+  },
+  "bath_tile": {
+   "type": "baked",
+   "map": "tex/bath_tile.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.1,
+   "metal": 0.0
+  },
+  "ceiling": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.82,
+    0.82,
+    0.8
+   ],
+   "rough": 0.95,
+   "metal": 0.0
+  },
+  "door_white": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.78,
+    0.77,
+    0.74
+   ],
+   "rough": 0.45,
+   "metal": 0.0
+  },
+  "glass": {
+   "type": "glass"
+  },
+  "glass_rail": {
+   "type": "glass"
+  },
+  "laminate": {
+   "type": "baked",
+   "map": "tex/laminate.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.45,
+   "metal": 0.0
+  },
+  "paint": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.8,
+    0.8,
+    0.78
+   ],
+   "rough": 0.9,
+   "metal": 0.0
+  },
+  "porcelain": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.9,
+    0.9,
+    0.88
+   ],
+   "rough": 0.08,
+   "metal": 0.0
+  },
+  "soil": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.08,
+    0.06,
+    0.045
+   ],
+   "rough": 0.95,
+   "metal": 0.0
+  },
+  "steel": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.55,
+    0.56,
+    0.58
+   ],
+   "rough": 0.3,
+   "metal": 1.0
+  },
+  "tile_public": {
+   "type": "baked",
+   "map": "tex/tile_public.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.06,
+   "metal": 0.0
+  }
+ },
+ "exposure": 2.4000000953674316,
+ "vertexlit": {
+  "VC_furn": {
+   "intensity": 2.302190682244301
+  }
+ },
+ "sky": {
+  "file": "sky.jpg",
+  "rotation": 0.0
+ }
+}

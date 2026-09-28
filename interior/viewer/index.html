@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>和風宅 3D 導覽</title>
+<meta name="description" content="68 坪豪宅：空屋與日式和風裝潢的 3D 對照導覽，燈光以 Blender Cycles 烘焙，手機可流暢瀏覽。">
+<meta name="theme-color" content="#1c1a17">
+<style>
+  :root {
+    --bg: #1c1a17; --panel: rgba(28, 26, 23, .78); --line: rgba(255, 255, 255, .14);
+    --ink: #f4efe6; --ink2: #cfc6b8; --accent: #c8a46a; --accent-ink: #1c1a17;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden;
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; }
+  canvas { display: block; width: 100vw; height: 100vh; height: 100dvh; touch-action: none; }
+  .bar { position: fixed; left: 0; right: 0; display: flex; gap: 8px; align-items: center; padding: 10px 12px;
+    padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); pointer-events: none; }
+  .top { top: 0; padding-top: max(10px, env(safe-area-inset-top)); justify-content: space-between; flex-wrap: wrap; }
+  .bottom { bottom: 0; padding-bottom: max(12px, env(safe-area-inset-bottom)); flex-direction: column; align-items: stretch; }
+  .title { pointer-events: auto; background: var(--panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--line); border-radius: 12px; padding: 7px 12px; line-height: 1.25; }
+  .title b { font-size: 15px; font-weight: 700; letter-spacing: .04em; }
+  .title small { display: block; font-size: 11.5px; color: var(--ink2); }
+  .seg { pointer-events: auto; display: inline-flex; background: var(--panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+  .seg button { appearance: none; border: 0; background: transparent; color: var(--ink2); font: inherit; font-size: 14px;
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; min-width: 64px; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .seg button:disabled { opacity: .45; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .rooms { pointer-events: auto; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px; }
+  .rooms::-webkit-scrollbar { display: none; }
+  .rooms button { flex: none; appearance: none; font: inherit; font-size: 13.5px; color: var(--ink); cursor: pointer;
+    background: var(--panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px; }
+  .rooms button.on { border-color: var(--accent); color: var(--accent); }
+  .hint { align-self: center; font-size: 12px; color: var(--ink2); background: var(--panel); border-radius: 999px;
+    padding: 5px 12px; margin-bottom: 8px; border: 1px solid var(--line); transition: opacity .6s; pointer-events: none; }
+  .badge { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 30px; font-weight: 700;
+    letter-spacing: .3em; color: #fff; text-shadow: 0 2px 16px rgba(0,0,0,.6); opacity: 0; transition: opacity .5s; pointer-events: none; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 5; transition: opacity .6s; }
+  #loading .box { width: min(320px, 80vw); text-align: center; }
+  #loading .t { font-size: 18px; letter-spacing: .12em; margin-bottom: 14px; }
+  #loading .track { height: 3px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  #loading .fill { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  #loading .s { margin-top: 10px; font-size: 12px; color: var(--ink2); }
+  .ring { position: fixed; width: 44px; height: 44px; margin: -22px 0 0 -22px; border: 2px solid rgba(255,255,255,.9);
+    border-radius: 50%; pointer-events: none; opacity: 0; transform: scaleY(.45); transition: opacity .25s; }
+  @media (max-width: 520px) { .title small { display: none; } .seg button { padding: 7px 11px; min-width: 54px; font-size: 13.5px; } }
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="室內 3D 導覽"></canvas>
+<div class="ring" id="ring"></div>
+<div class="badge" id="badge"></div>
+
+<div class="bar top">
+  <div class="title"><b>68 坪・和風宅</b><small>空屋 ⇄ 日式和風裝潢　Cycles 烘焙光照</small></div>
+  <div class="controls">
+    <div class="seg" role="group" aria-label="裝潢">
+      <button id="vEmpty" aria-pressed="false">空屋</button>
+      <button id="vWa" aria-pressed="true">和風</button>
+    </div>
+    <div class="seg" role="group" aria-label="模式">
+      <button id="mWalk" aria-pressed="true">漫遊</button>
+      <button id="mDoll" aria-pressed="false">俯瞰</button>
+    </div>
+  </div>
+</div>
+
+<div class="bar bottom">
+  <div class="hint" id="hint">拖曳環顧・點地板前往・雙指縮放</div>
+  <div class="rooms" id="rooms"></div>
+</div>
+
+<div id="loading"><div class="box"><div class="t">載入中</div><div class="track"><div class="fill" id="fill"></div></div><div class="s" id="status">準備場景…</div></div></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script type="module" src="viewer.js"></script>
+</body>
+</html>

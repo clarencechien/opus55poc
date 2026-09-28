@@ -15,6 +15,17 @@
   - 紀錄片試片（1935–1937 建橋，25 秒、30 fps）：`modal run render/modal_render.py::anim --clip build` 將 750 格分 10 段平行渲染到 Modal Volume，再加中文字幕、淡入淡出並以 H.264 編碼成 `render/out/pilot_build.mp4`；`--probe 60,300,700 --res 960x540 --samples 48` 只渲染幾格快速檢查
 - `assets/waternormals.jpg` — 水面法線貼圖（three.js 範例素材，MIT）
 
+## 和風宅：空屋 ⇄ 日式和風（`interior/`）
+
+一張 68 坪豪宅家具配置圖 → 空屋平面 → 空屋 3D → 日式和風裝潢渲染 → 手機可跑的 3D 導覽。
+
+- `interior/plan.json` — 由原圖描出的牆、柱、門窗、樑、房間（像素座標＋比例），所有後續步驟共用這一份資料；`tools/plan_tools.py` 可疊圖檢查、算面積、輸出空屋平面 SVG 與公尺座標
+- `interior/blender/interior_scene.py` — Blender 程序化建模：`--variant empty` 交屋空屋、`--variant wa` 和風裝潢（和室＋雪見障子、坪庭、秋田杉電視牆、竿緣天井、間接照明、檜木浴缸…），Poly Haven CC0 材質／HDRI／植栽茶具
+- `interior/blender/bake_export.py` — 把 Cycles 光照烘焙成光照圖（大面）與逐角頂點色（細小構件、軟墊），輸出 GLB＋manifest 給手機導覽
+- `interior/modal_interior.py` — 在 Modal L40S 上執行：`::plan`（平面圖轉 PNG）、`::render --variant empty,wa --shots living,washitsu…`、`::bake --variant empty,wa`
+- `interior/index.html` — 空屋／和風逐空間拖曳對照頁；`interior/viewer/` — three.js 手機 3D 導覽（漫遊／俯瞰、空屋／和風即時切換，材質為貼圖×烘焙光照，不做即時光照）
+- `interior/renders/` — 渲染成品
+
 ## 部署（GitHub Pages）
 
 純靜態網站，無需建置。在 repo 的 **Settings → Pages** 選擇要發布的分支與根目錄 `/`，即可於 `https://<帳號>.github.io/<repo>/` 瀏覽。three.js 由 jsDelivr CDN 載入。
