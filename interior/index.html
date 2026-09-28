@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>和風宅改造對照</title>
+<meta name="description" content="68 坪豪宅：由家具配置圖轉成空屋平面、空屋 3D，再做成日式和風裝潢的 Blender Cycles 渲染與可在手機瀏覽的 3D 導覽。">
+<meta name="theme-color" content="#1c1a17">
+<style>
+  :root { --bg: #f6f2ea; --ink: #2a2622; --ink2: #6f665b; --line: #e2d9ca; --card: #fffdf8; --accent: #a8773a; --dark: #1c1a17; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1c1a17; --ink: #f1ebe0; --ink2: #b9ae9f; --line: #3a342d; --card: #24211d; --accent: #d1a766; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.7;
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+  header.hero { position: relative; min-height: 78vh; display: grid; align-items: end; color: #fff; overflow: hidden; background: var(--dark); }
+  header.hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .9; }
+  header.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.05) 35%, rgba(0,0,0,.7)); }
+  header.hero .wrap { position: relative; z-index: 1; padding-bottom: 42px; }
+  header.hero .kicker { color: #f0d49e; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  h1 { font-family: "Noto Serif TC", "Songti TC", serif; font-size: clamp(30px, 6vw, 54px); line-height: 1.2; margin: 0 0 10px; letter-spacing: .04em; }
+  .lead { font-size: clamp(15px, 2.2vw, 18px); max-width: 640px; opacity: .92; margin: 0 0 20px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #1c1a17; font-weight: 700; text-decoration: none;
+    padding: 12px 20px; border-radius: 999px; margin: 4px 8px 4px 0; }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.4); }
+  section { padding: 56px 0 8px; }
+  h2 { font-family: "Noto Serif TC", "Songti TC", serif; font-size: clamp(22px, 3.4vw, 30px); margin: 0 0 6px; letter-spacing: .04em; }
+  .kicker { color: var(--accent); font-size: 13px; letter-spacing: .18em; }
+  p.note { color: var(--ink2); margin: 0 0 18px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 18px 0; }
+  .fact { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .fact b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .fact span { font-size: 12.5px; color: var(--ink2); }
+  figure { margin: 0; }
+  .plan img { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); background: #fbfaf7; }
+  figcaption { font-size: 13px; color: var(--ink2); margin-top: 8px; }
+  .ba { position: relative; aspect-ratio: 16 / 10; border-radius: 12px; overflow: hidden; background: #111; user-select: none; touch-action: pan-y; cursor: ew-resize; }
+  .ba img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+  .ba .after { clip-path: inset(0 0 0 var(--x, 50%)); }
+  .ba .handle { position: absolute; top: 0; bottom: 0; left: var(--x, 50%); width: 2px; background: #fff; transform: translateX(-1px); box-shadow: 0 0 10px rgba(0,0,0,.4); }
+  .ba .handle::after { content: "◀ ▶"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; letter-spacing: 2px;
+    background: #fff; color: #222; border-radius: 999px; padding: 7px 10px; white-space: nowrap; }
+  .ba .tag { position: absolute; top: 10px; font-size: 12.5px; background: rgba(0,0,0,.55); color: #fff; padding: 3px 10px; border-radius: 999px; }
+  .ba .tag.l { left: 10px; } .ba .tag.r { right: 10px; }
+  .room { display: grid; grid-template-columns: 1.6fr 1fr; gap: 20px; align-items: start; margin: 26px 0 34px; }
+  .room h3 { margin: 0 0 6px; font-size: 19px; }
+  .room ul { margin: 6px 0 0; padding-left: 1.1em; color: var(--ink2); font-size: 14.5px; }
+  .room ul li { margin: 3px 0; }
+  @media (max-width: 760px) { .room { grid-template-columns: 1fr; gap: 10px; } }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid2 img { width: 100%; border-radius: 12px; display: block; }
+  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; background: var(--card); border-radius: 12px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 13px; color: var(--ink2); font-weight: 600; }
+  .cta { background: var(--dark); color: #f1ebe0; border-radius: 16px; padding: 26px; margin: 40px 0; display: grid; gap: 8px; }
+  footer { color: var(--ink2); font-size: 13px; padding: 40px 0 60px; }
+  footer a, section a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header class="hero">
+  <img src="renders/wa_living.jpg" alt="和風裝潢後的客廳：障子、疊蓆地墊、秋田杉電視牆與間接照明">
+  <div class="wrap">
+    <div class="kicker">68 坪・四房二廳＋和室</div>
+    <h1>空屋 ⇄ 日式和風</h1>
+    <p class="lead">從一張家具配置圖開始：描出牆柱門窗做成空屋平面、搭出空屋 3D，再以日式和風重新裝潢，用 Blender Cycles 算出真實光影，並烘焙成手機跑得動的 3D 導覽。</p>
+    <a class="btn" href="viewer/">開啟 3D 導覽（可切換空屋／和風）</a>
+    <a class="btn ghost" href="#rooms">看各空間對照</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="plan">
+    <div class="kicker">STEP 1</div>
+    <h2>空屋平面</h2>
+    <p class="note">依原家具配置圖描出牆、柱、門、窗與陽台，以浴缸、馬桶、門寬校準比例（每像素約 2.18 cm），再換算各空間面積。牆柱門窗為示意，非施工圖。</p>
+    <div class="facts">
+      <div class="fact"><b>20.3 × 13.3 m</b><span>外輪廓</span></div>
+      <div class="fact"><b>約 68 坪</b><span>室內含牆柱</span></div>
+      <div class="fact"><b>191 m²</b><span>室內淨面積（57.7 坪）</span></div>
+      <div class="fact"><b>24 m²</b><span>陽台三處＋花台</span></div>
+      <div class="fact"><b>5 房 3 衛</b><span>和風版將臥室三改為和室</span></div>
+    </div>
+    <figure class="plan"><img src="renders/plan_empty.jpg" alt="空屋平面圖：各房間名稱與面積" loading="lazy"><figcaption>空屋平面示意（由 <code>plan.json</code> 產生，同一份資料也用來建 3D 模型與手機導覽）</figcaption></figure>
+  </section>
+
+  <section id="axo">
+    <div class="kicker">STEP 2 → 3</div>
+    <h2>空屋 3D 與和風裝潢</h2>
+    <p class="note">拖曳中間的把手比較。左：建商交屋狀態（白牆、拋光石英磚、木紋地板、無天花）；右：和風裝潢後。</p>
+    <div class="ba" data-ba><img src="renders/empty_axo.jpg" alt="空屋 3D 俯瞰"><img class="after" src="renders/wa_axo.jpg" alt="和風裝潢 3D 俯瞰"><div class="handle"></div><span class="tag l">空屋</span><span class="tag r">和風</span></div>
+  </section>
+
+  <section id="rooms">
+    <div class="kicker">STEP 4</div>
+    <h2>各空間的差別</h2>
+    <p class="note">同一個鏡頭、同一天的光線，只有裝潢不同。</p>
+
+    <div class="room">
+      <div class="ba" data-ba><img src="renders/empty_living.jpg" alt="空屋客廳"><img class="after" src="renders/wa_living.jpg" alt="和風客廳"><div class="handle"></div><span class="tag l">空屋</span><span class="tag r">和風</span></div>
+      <div><h3>客廳</h3><ul>
+        <li>陽台落地窗內加一層<strong>雪見障子</strong>：上半和紙柔化光線、下半玻璃留住庭院景</li>
+        <li>水泥磚電視牆嵌<strong>秋田杉</strong>框與千本格子門，下方低台度淡化電視比例</li>
+        <li>地毯換成灰炭雙色<strong>琉球疊</strong>，低矮木座沙發、橢圓胡桃木矮桌、鳥居椅</li>
+        <li>天花降到 2.75 m，四周<strong>間接照明</strong>、方形四燈嵌燈、大樑包覆栓木</li>
+        <li>拋光石英磚換成淺色橡木地板</li>
+      </ul></div>
+    </div>
+
+    <div class="room">
+      <div class="ba" data-ba><img src="renders/empty_washitsu.jpg" alt="空屋臥室三"><img class="after" src="renders/wa_washitsu.jpg" alt="和室"><div class="handle"></div><span class="tag l">空屋</span><span class="tag r">和風</span></div>
+      <div><h3>和室（原臥室三）</h3><ul>
+        <li>拆掉與客廳之間的隔間牆，改成四扇<strong>障子</strong>，打開時和室與客廳連成一氣</li>
+        <li>架高 36 cm 的<strong>榻榻米</strong>地台，床之間（床板、床柱、掛軸、花器）與押入襖門</li>
+        <li><strong>竿緣天井</strong>：杉木板與細竿，中央吊掛竹編燈</li>
+        <li>座卓配鳥居椅與圓座布團</li>
+      </ul></div>
+    </div>
+
+    <div class="room">
+      <div class="ba" data-ba><img src="renders/empty_garden.jpg" alt="空屋窗景"><img class="after" src="renders/wa_garden.jpg" alt="和室雪見障子窗景"><div class="handle"></div><span class="tag l">空屋</span><span class="tag r">和風</span></div>
+      <div><h3>窗景：花台變成坪庭</h3><ul>
+        <li>和室窗外原本只是花台，改成<strong>枯山水坪庭</strong>：白砂、苔石、飛石、石燈籠、楓樹</li>
+        <li>竹垣遮住外側欄杆，<strong>雪見障子</strong>拉起一扇即見庭景</li>
+        <li>夜間石燈籠與投射燈點亮庭院</li>
+      </ul></div>
+    </div>
+
+    <div class="room">
+      <div class="ba" data-ba><img src="renders/empty_dining.jpg" alt="空屋餐廳"><img class="after" src="renders/wa_dining.jpg" alt="和風餐廳"><div class="handle"></div><span class="tag l">空屋</span><span class="tag r">和風</span></div>
+      <div><h3>餐廳</h3><ul>
+        <li>栓木<strong>格櫃</strong>兩側加千本格子拉門，收納也是展示</li>
+        <li>70 cm 日式餐桌高度，圓錐腳餐椅、弧形笠木與布面椅墊</li>
+        <li>兩盞吊燈、牆面周邊間接光</li>
+      </ul></div>
+    </div>
+
+    <div class="room">
+      <div class="ba" data-ba><img src="renders/empty_entry.jpg" alt="空屋玄關"><img class="after" src="renders/wa_entry.jpg" alt="和風玄關"><div class="handle"></div><span class="tag l">空屋</span><span class="tag r">和風</span></div>
+      <div><h3>玄關</h3><ul>
+        <li>石材落塵區與<strong>上框</strong>，脫鞋入內</li>
+        <li>一側懸浮鞋櫃配格子門與底部間接光，一側<strong>杉木格柵牆</strong></li>
+        <li>一進門便看到客廳盡頭的障子與綠意</li>
+      </ul></div>
+    </div>
+
+    <div class="room">
+      <div class="ba" data-ba><img src="renders/empty_master.jpg" alt="空屋主臥"><img class="after" src="renders/wa_master.jpg" alt="和風主臥"><div class="handle"></div><span class="tag l">空屋</span><span class="tag r">和風</span></div>
+      <div><h3>主臥</h3><ul>
+        <li>落地窗內加<strong>格子障子</strong>，光影柔和</li>
+        <li>低床台、杉木床頭板與行燈，一整排栓木衣櫃</li>
+        <li>天花四周間接照明，窗邊一對低座椅</li>
+      </ul></div>
+    </div>
+
+    <div class="room">
+      <div class="ba" data-ba><img src="renders/empty_bath.jpg" alt="空屋主浴"><img class="after" src="renders/wa_bath.jpg" alt="和風主浴"><div class="handle"></div><span class="tag l">空屋</span><span class="tag r">和風</span></div>
+      <div><h3>主浴</h3><ul>
+        <li><strong>檜木浴缸</strong>取代一般浴缸</li>
+        <li>大理石牆地，杉木懸浮浴櫃、碗盆，鏡上層疊木作間接光</li>
+        <li>玻璃隔出淋浴區</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section id="night">
+    <h2>夜晚</h2>
+    <p class="note">關掉日光、只留間接照明、嵌燈、行燈與竹編燈。</p>
+    <div class="grid2"><img src="renders/wa_living_night.jpg" alt="夜晚的客廳" loading="lazy"><img src="renders/wa_washitsu_night.jpg" alt="夜晚的和室" loading="lazy"></div>
+  </section>
+
+  <section id="materials">
+    <h2>和風的材料表</h2>
+    <p class="note">做法參考玳爾日式空間設計的〈善用自然光景 日式和風私宅〉（DECOmyplace，2016）：以窗外之景為軸心，職人建具、和風三具、自然建材。</p>
+    <table>
+      <tr><th>部位</th><th>空屋（交屋）</th><th>和風</th></tr>
+      <tr><td>地坪</td><td>拋光石英磚／木紋地板</td><td>淺色橡木地板、和室榻榻米、玄關石材</td></tr>
+      <tr><td>牆面</td><td>白色乳膠漆</td><td>暖白珪藻土感塗裝、水泥磚電視牆、杉木格柵</td></tr>
+      <tr><td>天花</td><td>樓板＋外露大樑</td><td>2.75 m 平頂＋四周間接光、樑包栓木、和室竿緣天井</td></tr>
+      <tr><td>建具</td><td>鋁窗、白色平板門</td><td>雪見障子、格子障子、襖、千本格子、栓木門片</td></tr>
+      <tr><td>家具</td><td>—</td><td>低座木架沙發、橢圓胡桃木桌、鳥居椅、座卓、日式餐椅、低床台</td></tr>
+      <tr><td>燈具</td><td>燈座</td><td>間接照明、方形四燈嵌燈、竹編吊燈、行燈、石燈籠</td></tr>
+      <tr><td>浴室</td><td>磁磚、一般浴缸</td><td>大理石、檜木浴缸、杉木浴櫃</td></tr>
+    </table>
+  </section>
+
+  <div class="cta">
+    <b style="font-size:18px">在手機上走一圈</b>
+    <span>3D 導覽的光影全部由 Cycles 事先烘焙進貼圖，手機只需貼圖×光照圖，不做即時光照，所以中階手機也順。點地板前往、拖曳環顧，右上角切換空屋／和風與俯瞰。</span>
+    <div><a class="btn" href="viewer/">開啟 3D 導覽</a></div>
+  </div>
+
+  <footer>
+    <p>製作：家具配置圖 → <code>plan.json</code>（描牆）→ SVG 空屋平面 → Blender 4.2 程序化建模 → Cycles（Modal L40S GPU）渲染與光照烘焙 → three.js 手機導覽。材質、HDRI（Ninomaru Teien）與植栽／茶具模型為 <a href="https://polyhaven.com/">Poly Haven</a> CC0 素材。</p>
+    <p>所有畫面為依平面推估的設計示意，非施工圖；和風設計參考 <a href="https://decomyplace.com/n.php?id=4612">玳爾日式空間設計 案例</a>。</p>
+  </footer>
+</main>
+
+<script>
+  document.querySelectorAll("[data-ba]").forEach((el) => {
+    const set = (clientX) => {
+      const r = el.getBoundingClientRect();
+      const x = Math.min(100, Math.max(0, ((clientX - r.left) / r.width) * 100));
+      el.style.setProperty("--x", x + "%");
+    };
+    let drag = false;
+    el.addEventListener("pointerdown", (e) => { drag = true; el.setPointerCapture(e.pointerId); set(e.clientX); });
+    el.addEventListener("pointermove", (e) => { if (drag) set(e.clientX); });
+    el.addEventListener("pointerup", () => (drag = false));
+    el.addEventListener("pointercancel", () => (drag = false));
+  });
+</script>
+</body>
+</html>
