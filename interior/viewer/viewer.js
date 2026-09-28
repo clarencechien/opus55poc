@@ -60,10 +60,12 @@ const vkey = (id, q = quality) => (q === "hq" ? `${id}-hq` : id);
 // specular reflection only, never a second copy of the diffuse light
 const MAPS_NO_IBL_DIFFUSE = THREE.ShaderChunk.lights_fragment_maps
   .replace("iblIrradiance += getIBLIrradiance( geometryNormal );", "")
-  .replace("#if defined( RE_IndirectDiffuse )", "#if defined( RE_IndirectDiffuse )\n#ifdef USE_VCLIGHT\nirradiance += vColor.rgb * vcIntensity;\n#endif");
+  .replace("#if defined( RE_IndirectDiffuse )", "#if defined( RE_IndirectDiffuse )\nirradiance = vec3( 0.0 );\n#ifdef USE_VCLIGHT\nirradiance += vColor.rgb * vcIntensity;\n#endif");
 function patchHQ(m, vcIntensity) {
   m.onBeforeCompile = (sh) => {
-    sh.fragmentShader = sh.fragmentShader.replace("#include <lights_fragment_maps>", MAPS_NO_IBL_DIFFUSE);
+    // the scene's hemisphere / directional lights are for the imported props only: baked surfaces ignore them
+    sh.fragmentShader = sh.fragmentShader.replace("#include <lights_fragment_maps>", MAPS_NO_IBL_DIFFUSE)
+      .replace("#include <lights_fragment_end>", "reflectedLight.directDiffuse = vec3( 0.0 );\nreflectedLight.directSpecular = vec3( 0.0 );\n#include <lights_fragment_end>");
     if (vcIntensity !== undefined) {
       sh.uniforms.vcIntensity = { value: vcIntensity };
       sh.fragmentShader = "#define USE_VCLIGHT\nuniform float vcIntensity;\n" +
@@ -145,6 +147,9 @@ async function loadVariant(key, report) {
       if (vl) { m.vertexColors = true; patchHQ(m, vl.intensity * Math.PI * boost); }
       else { if (lm && lm.tex) { m.lightMap = lm.tex; m.lightMapIntensity = lm.intensity * boost; } patchHQ(m); }
       if (def.paper) { m.side = THREE.DoubleSide; m.roughness = 1; }
+      // reflections only where they read: polished stone, lacquer, water; rough plaster / wood / fabric barely reflect
+      const r = def.roughMap ? 0.6 * (def.roughMul ?? 1) : def.rough ?? 0.5;
+      m.envMapIntensity = def.coat > 0 ? 0.5 : r < 0.2 ? 0.9 : r < 0.45 ? 0.35 : 0.08;
       hqMaterials.add(m);
     } else {
       m = new THREE.MeshBasicMaterial();
@@ -384,7 +389,7 @@ function applyQuality() {
     const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
     composer = new EffectComposer(renderer, rt);
     composer.addPass(new RenderPass(scene, camera));
-    bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.32, 0.55, 1.1);
+    bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.25, 0.4, 4.0);   // only lamps (emissive > 4) glow
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
   }

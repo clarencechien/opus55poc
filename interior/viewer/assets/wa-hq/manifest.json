@@ -1,0 +1,659 @@
+{
+ "variant": "wa",
+ "lightmaps": {
+  "BAKE_arch": {
+   "file": "lm_arch.jpg",
+   "intensity": 35.558225488126375,
+   "size": 4096
+  },
+  "BAKE_furn": {
+   "file": "lm_furn.jpg",
+   "intensity": 24.298862308391517,
+   "size": 4096
+  },
+  "BAKE_arch_h": {
+   "file": "lm_arch_h.jpg",
+   "intensity": 150.64282704846653,
+   "size": 4096
+  }
+ },
+ "materials": {
+  "alu": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.05,
+    0.05,
+    0.055
+   ],
+   "rough": 0.35,
+   "metal": 0.8,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "ash": {
+   "type": "baked",
+   "map": "tex/ash.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.45,
+   "metal": 0.0,
+   "normalMap": "tex/ash_n.jpg",
+   "roughMap": "tex/ash_r.jpg",
+   "normalScale": 0.25,
+   "roughMul": 0.9,
+   "coat": 0.0
+  },
+  "balcony": {
+   "type": "baked",
+   "map": "tex/balcony.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/balcony_n.jpg",
+   "roughMap": "tex/balcony_r.jpg",
+   "normalScale": 0.4,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "bamboo": {
+   "type": "baked",
+   "map": "tex/bamboo.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/bamboo_n.jpg",
+   "roughMap": "tex/bamboo_r.jpg",
+   "normalScale": 0.6,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "bedding": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.88,
+    0.86,
+    0.82
+   ],
+   "rough": 0.9,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "black": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "rough": 0.4,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "cedar": {
+   "type": "baked",
+   "map": "tex/cedar.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/cedar_n.jpg",
+   "roughMap": "tex/cedar_r.jpg",
+   "normalScale": 0.25,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "ceiling": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.82,
+    0.82,
+    0.8
+   ],
+   "rough": 0.95,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "cement_tile": {
+   "type": "baked",
+   "map": "tex/cement_tile.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/cement_tile_n.jpg",
+   "roughMap": "tex/cement_tile_r.jpg",
+   "normalScale": 0.4,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "ceramic": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.75,
+    0.72,
+    0.66
+   ],
+   "rough": 0.25,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "chair_fabric": {
+   "type": "baked",
+   "map": "tex/chair_fabric.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/chair_fabric_n.jpg",
+   "roughMap": "tex/chair_fabric_r.jpg",
+   "normalScale": 0.7,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "cushion": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.2,
+    0.22,
+    0.24
+   ],
+   "rough": 0.9,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "dark_wood": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.12,
+    0.08,
+    0.05
+   ],
+   "rough": 0.4,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "downlight": {
+   "type": "emit",
+   "color": [
+    1.0,
+    0.9,
+    0.78
+   ],
+   "strength": 25.0
+  },
+  "fabric_grey": {
+   "type": "baked",
+   "map": "tex/fabric_grey.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/fabric_grey_n.jpg",
+   "roughMap": "tex/fabric_grey_r.jpg",
+   "normalScale": 0.6,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "fusuma": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.84,
+    0.8,
+    0.72
+   ],
+   "rough": 0.8,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "glass": {
+   "type": "glass"
+  },
+  "glass_rail": {
+   "type": "glass"
+  },
+  "gravel": {
+   "type": "baked",
+   "map": "tex/gravel.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/gravel_n.jpg",
+   "roughMap": "tex/gravel_r.jpg",
+   "normalScale": 0.9,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "hinoki": {
+   "type": "baked",
+   "map": "tex/hinoki.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/hinoki_n.jpg",
+   "roughMap": "tex/hinoki_r.jpg",
+   "normalScale": 0.2,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "indigo": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.12,
+    0.17,
+    0.28
+   ],
+   "rough": 0.85,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "lacquer": {
+   "type": "baked",
+   "map": "tex/lacquer.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/lacquer_n.jpg",
+   "roughMap": "tex/lacquer_r.jpg",
+   "normalScale": 0.15,
+   "roughMul": 1.0,
+   "coat": 0.6
+  },
+  "lamp_paper": {
+   "type": "emit",
+   "color": [
+    1.0,
+    0.86,
+    0.68
+   ],
+   "strength": 6.0
+  },
+  "led_warm": {
+   "type": "emit",
+   "color": [
+    1.0,
+    0.8,
+    0.58
+   ],
+   "strength": 30.0
+  },
+  "linen": {
+   "type": "baked",
+   "map": "tex/linen.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/linen_n.jpg",
+   "roughMap": "tex/linen_r.jpg",
+   "normalScale": 0.4,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "marble": {
+   "type": "baked",
+   "map": "tex/marble.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.1,
+   "metal": 0.0,
+   "normalMap": "tex/marble_n.jpg",
+   "roughMap": null,
+   "normalScale": 0.1,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "mirror": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.9,
+    0.9,
+    0.9
+   ],
+   "rough": 0.02,
+   "metal": 1.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "oak_floor": {
+   "type": "baked",
+   "map": "tex/oak_floor.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.425,
+   "metal": 0.0,
+   "normalMap": "tex/oak_floor_n.jpg",
+   "roughMap": "tex/oak_floor_r.jpg",
+   "normalScale": 0.35,
+   "roughMul": 0.85,
+   "coat": 0.0
+  },
+  "paint": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.8,
+    0.8,
+    0.78
+   ],
+   "rough": 0.9,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "plaster": {
+   "type": "baked",
+   "map": "tex/plaster.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/plaster_n.jpg",
+   "roughMap": "tex/plaster_r.jpg",
+   "normalScale": 0.2,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "porcelain": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.9,
+    0.9,
+    0.88
+   ],
+   "rough": 0.08,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "scroll": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.86,
+    0.83,
+    0.74
+   ],
+   "rough": 0.8,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "sofa_fabric": {
+   "type": "baked",
+   "map": "tex/sofa_fabric.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/sofa_fabric_n.jpg",
+   "roughMap": "tex/sofa_fabric_r.jpg",
+   "normalScale": 0.7,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "steel": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.55,
+    0.56,
+    0.58
+   ],
+   "rough": 0.3,
+   "metal": 1.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "stone": {
+   "type": "baked",
+   "map": "tex/stone.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/stone_n.jpg",
+   "roughMap": "tex/stone_r.jpg",
+   "normalScale": 0.4,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "tatami_a": {
+   "type": "baked",
+   "map": "tex/tatami_a.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/tatami_a_n.jpg",
+   "roughMap": "tex/tatami_a_r.jpg",
+   "normalScale": 0.8,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "tatami_b": {
+   "type": "baked",
+   "map": "tex/tatami_b.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/tatami_b_n.jpg",
+   "roughMap": "tex/tatami_b_r.jpg",
+   "normalScale": 0.8,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "tatami_g": {
+   "type": "baked",
+   "map": "tex/tatami_g.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/tatami_g_n.jpg",
+   "roughMap": "tex/tatami_g_r.jpg",
+   "normalScale": 0.8,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "walnut": {
+   "type": "baked",
+   "map": "tex/walnut.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/walnut_n.jpg",
+   "roughMap": "tex/walnut_r.jpg",
+   "normalScale": 0.25,
+   "roughMul": 1.0,
+   "coat": 0.3
+  },
+  "washi": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.93,
+    0.91,
+    0.85
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0,
+   "paper": true
+  },
+  "water": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.1,
+    0.16,
+    0.15
+   ],
+   "rough": 0.03,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "zabuton": {
+   "type": "baked",
+   "map": "tex/zabuton.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/zabuton_n.jpg",
+   "roughMap": "tex/zabuton_r.jpg",
+   "normalScale": 0.6,
+   "roughMul": 1.0,
+   "coat": 0.0
+  }
+ },
+ "exposure": 1.5,
+ "vertexlit": {
+  "VC_furn": {
+   "intensity": 12.568006443071392
+  }
+ },
+ "sky": {
+  "file": "sky.jpg",
+  "rotation": 0.0
+ },
+ "props": "../wa/props.glb"
+}
