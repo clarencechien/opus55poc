@@ -34,6 +34,8 @@ ap.add_argument("--bake", default="", help="output dir: bake lightmaps and expor
 ap.add_argument("--texel", type=float, default=48.0, help="lightmap texels per metre")
 ap.add_argument("--night", action="store_true")
 ap.add_argument("--hq", action="store_true", help="bake: high-quality set (denser lightmaps, PBR maps)")
+ap.add_argument("--walk", default="", help="walkthrough: first:last[:step] frames of the camera path (12 fps)")
+ap.add_argument("--outdir", default="", help="walkthrough: directory for JPEG frames")
 A = ap.parse_args(argv)
 WA = A.variant == "wa"
 T0 = time.time()
@@ -1246,6 +1248,54 @@ SHOTS = {
 }
 
 
+# walkthrough waypoints: camera (px), look-at (px, height m), label; eye height 1.5 m; ~0.9 m/s, turns in place ~2 s
+WALK = [
+    ((692, 662), (692, 380, 1.25), "玄關"),
+    ((692, 560), (690, 330, 1.3), "玄關"),
+    ((700, 460), (600, 250, 1.2), "客廳"),
+    ((650, 362), (470, 230, 1.1), "客廳"),
+    ((590, 345), (450, 170, 1.05), "和室"),
+    ((565, 300), (445, 145, 1.05), "和室・窗景"),
+    ((565, 300), (520, 470, 1.0), "餐廳"),
+    ((640, 400), (760, 410, 1.3), "餐廳"),
+    ((762, 410), (900, 395, 1.3), "主臥"),
+    ((860, 418), (815, 230, 0.9), "主臥"),
+    ((935, 478), (890, 530, 1.2), "主臥"),
+    ((905, 527), (800, 560, 1.0), "主浴"),
+    ((815, 497), (868, 580, 0.75), "主浴"),
+]
+WALK_FPS = 18
+
+
+def walk_frames():
+    """frame number of every waypoint: distance at ~0.9 m/s, in-place turns ~2 s, a 1 s hold at both ends"""
+    fr = [1 + WALK_FPS]
+    for (p0, l0, _), (p1, l1, _) in zip(WALK, WALK[1:]):
+        d = math.hypot(p1[0] - p0[0], p1[1] - p0[1]) * S
+        a0 = math.atan2(l0[1] - p0[1], l0[0] - p0[0]); a1 = math.atan2(l1[1] - p1[1], l1[0] - p1[0])
+        turn = abs((a1 - a0 + math.pi) % (2 * math.pi) - math.pi)
+        fr.append(fr[-1] + max(int(d / 0.9 * WALK_FPS), int(turn / 1.2 * WALK_FPS), 8))
+    return fr
+
+
+def walk_camera():
+    cd = bpy.data.cameras.new("cam"); cd.sensor_width = 36; cd.lens = 17; cd.clip_start = 0.05
+    o = bpy.data.objects.new("X_cam", cd); COLL.objects.link(o); sc.camera = o
+    tgt = bpy.data.objects.new("X_cam_target", None); COLL.objects.link(tgt)
+    tc = o.constraints.new("TRACK_TO"); tc.target = tgt; tc.track_axis = "TRACK_NEGATIVE_Z"; tc.up_axis = "UP_Y"
+    fr = walk_frames()
+    for f, ((x, y), (tx, ty, tz), _) in zip(fr, WALK):
+        o.location = (PX(x), PY(y), 1.5); o.keyframe_insert("location", frame=f)
+        tgt.location = (PX(tx), PY(ty), tz); tgt.keyframe_insert("location", frame=f)
+    for ob in (o, tgt):
+        for fc in ob.animation_data.action.fcurves:
+            for kp in fc.keyframe_points:
+                kp.interpolation = "BEZIER"; kp.handle_left_type = kp.handle_right_type = "AUTO_CLAMPED"
+    sc.frame_start, sc.frame_end = 1, fr[-1] + WALK_FPS
+    print("[walk] frames", sc.frame_end, "labels", [(f, w[2]) for f, w in zip(fr, WALK)])
+    return fr
+
+
 def camera(shot):
     cd = bpy.data.cameras.new("cam"); cd.sensor_width = 36
     o = bpy.data.objects.new("X_cam", cd); COLL.objects.link(o); sc.camera = o
@@ -1314,7 +1364,7 @@ if A.bake:
     bk = importlib.util.module_from_spec(spec); spec.loader.exec_module(bk)
     bk.run(A, sc, MATS, tick)
 else:
-    if A.shot == "axo":
+    if A.shot == "axo" and not A.walk:
         for o in bpy.data.objects:          # cutaway: no slab, no ceilings, no beams
             if o.name in ("A_slab", "A_ceiling", "A_beams", "E_cove") or (o.name.startswith("E_sub") and o.data and
                                                                          any(m.name.startswith("downlight") for m in o.data.materials)):
@@ -1323,6 +1373,22 @@ else:
                 o.hide_render = True
         if "A_slab" in bpy.data.objects:
             pass
+    if A.walk:
+        walk_camera()
+        render_settings(A.res, A.samples)
+        parts = [int(v) for v in A.walk.split(":")]
+        sc.frame_start, sc.frame_end = parts[0], min(parts[1], sc.frame_end)
+        sc.frame_step = parts[2] if len(parts) > 2 else 1
+        sc.render.fps = WALK_FPS
+        sc.cycles.adaptive_threshold = 0.03; sc.cycles.max_bounces = 8; sc.cycles.diffuse_bounces = 4
+        sc.cycles.seed = 7; sc.cycles.use_animated_seed = False
+        sc.render.use_persistent_data = True
+        sc.render.image_settings.file_format = "JPEG"; sc.render.image_settings.quality = 94
+        os.makedirs(A.outdir, exist_ok=True)
+        sc.render.filepath = os.path.join(os.path.abspath(A.outdir), "f_####")
+        bpy.ops.render.render(animation=True)
+        tick("walk rendered")
+        sys.exit(0)
     camera(A.shot)
     render_settings(A.res, A.samples)
     os.makedirs(os.path.dirname(os.path.abspath(A.out)), exist_ok=True)

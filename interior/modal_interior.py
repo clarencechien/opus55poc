@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import json
 import pathlib
 import subprocess
 import time
@@ -21,7 +22,8 @@ BLENDER_URL = f"https://download.blender.org/release/Blender4.2/blender-{BLENDER
 IGNORE = ["out", "viewer", "ref", "renders", "__pycache__", "*.webp", "*.html"]
 
 cpu_image = (modal.Image.debian_slim(python_version="3.11")
-             .apt_install("librsvg2-bin", "fonts-noto-cjk")
+             .apt_install("librsvg2-bin", "fonts-noto-cjk", "ffmpeg")
+             .pip_install("pillow==11.0.0", "numpy==2.1.3")
              .add_local_dir(str(HERE), REMOTE, ignore=IGNORE))
 gpu_image = (
     modal.Image.debian_slim(python_version="3.11")
@@ -164,3 +166,117 @@ def bake(variant: str = "empty,wa", texel: float = 64.0, samples: int = 256, ext
             p = HERE / "viewer" / "assets" / rel; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(data)
         print(f"[bake] {v} in {r['seconds']} s: {len(r['files'])} files")
         print(r["log"][-1500:])
+
+
+# ============================================================== walkthrough video
+frames_vol = modal.Volume.from_name("interior-frames", create_if_missing=True)
+FRAMES = "/frames"
+
+
+@app.function(image=gpu_image, gpu="L40S", volumes={ASSETS: assets_vol, FRAMES: frames_vol}, timeout=3600, cpu=4.0, memory=16384)
+def walk_chunk(job: str, variant: str, frames: str, res: str, samples: int) -> dict:
+    t0 = time.time()
+    outdir = pathlib.Path(FRAMES) / job; outdir.mkdir(parents=True, exist_ok=True)
+    run_blender(["--variant", variant, "--walk", frames, "--outdir", str(outdir), "--assets", ASSETS,
+                 "--plan", f"{REMOTE}/plan.json", "--res", res, "--samples", str(samples), "--out", "/tmp/x.png"])
+    frames_vol.commit()
+    return {"frames": frames, "seconds": round(time.time() - t0, 1)}
+
+
+@app.function(image=cpu_image, volumes={FRAMES: frames_vol}, timeout=1800, cpu=4.0, memory=8192)
+def walk_encode(job: str, labels: list, fps_in: int = 18, fps_out: int = 30) -> dict:
+    """burn in room captions, fade in/out, motion-interpolate to 30 fps (and keep the native rate), H.264"""
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont
+    frames_vol.reload()
+    src = sorted((pathlib.Path(FRAMES) / job).glob("f_*.jpg"))
+    W, H = Image.open(src[0]).size
+    s_ = H / 720
+
+    def font(path, size):
+        for i in range(10):
+            try:
+                f = ImageFont.truetype(path, size, index=i)
+            except OSError:
+                break
+            if f.getname()[0].endswith("TC"):
+                return f
+        return ImageFont.truetype(path, size)
+    big = font("/usr/share/fonts/opentype/noto/NotoSerifCJK-Bold.ttc", int(40 * s_))
+    small = font("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", int(17 * s_))
+
+    def card(text):
+        im = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+        x, y = int(56 * s_), H - int(96 * s_)
+        d.text((x, y), text, font=big, fill=(255, 250, 240, 255))
+        b = d.textbbox((x, y), text, font=big)
+        d.rectangle((x, b[3] + int(10 * s_), x + int(44 * s_), b[3] + int(12 * s_)), fill=(214, 170, 96, 255))
+        sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        sh.putalpha(im.getchannel("A").filter(ImageFilter.GaussianBlur(5 * s_)).point(lambda v: int(v * 0.7)))
+        return Image.alpha_composite(sh, im)
+    base = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(base)
+    tag = "68 坪・和風宅　Blender Cycles 路徑追蹤"
+    d.text((int(56 * s_), int(34 * s_)), tag, font=small, fill=(255, 255, 255, 190))
+    # label timeline: (first frame, text) -> spans
+    spans = []
+    for i, (f, t) in enumerate(labels):
+        if spans and spans[-1][2] == t:
+            continue
+        spans.append([f, None, t])
+    for i in range(len(spans) - 1):
+        spans[i][1] = spans[i + 1][0] - 1
+    spans[-1][1] = 10 ** 6
+    cards = {t: card(t) for _, _, t in spans}
+    tmp = pathlib.Path("/tmp/cap"); tmp.mkdir(exist_ok=True)
+    n = len(src); fade = 9
+    for k, fp in enumerate(src):
+        f = int(fp.stem.split("_")[1])
+        im = Image.open(fp).convert("RGBA")
+        im = Image.alpha_composite(im, base)
+        for a, b, t in spans:
+            if a <= f <= b:
+                al = min(1.0, (f - a + 1) / fade, (b - f + 1) / fade) if b < 10 ** 6 else min(1.0, (f - a + 1) / fade)
+                c = cards[t] if al >= 1 else Image.blend(Image.new("RGBA", (W, H), (0, 0, 0, 0)), cards[t], al)
+                im = Image.alpha_composite(im, c)
+        g = min(1.0, (k + 1) / 8, (n - k) / 8)
+        rgb = im.convert("RGB")
+        if g < 1:
+            rgb = Image.blend(Image.new("RGB", (W, H)), rgb, g)
+        rgb.save(tmp / f"c_{k:04d}.png")
+    out = pathlib.Path("/tmp/walk.mp4")
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(fps_in), "-i", str(tmp / "c_%04d.png"),
+                    "-vf", f"minterpolate=fps={fps_out}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,format=yuv420p",
+                    "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-movflags", "+faststart", str(out)], check=True)
+    raw = pathlib.Path("/tmp/walk_native.mp4")
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(fps_in), "-i", str(tmp / "c_%04d.png"),
+                    "-vf", "format=yuv420p", "-c:v", "libx264", "-crf", "18", str(raw)], check=True)
+    return {"mp4": out.read_bytes(), "mp4_12": raw.read_bytes(), "frames": n, "size": f"{W}x{H}"}
+
+
+@app.function(volumes={FRAMES: frames_vol}, timeout=600)
+def walk_fetch(job: str) -> dict:
+    frames_vol.reload()
+    return {f.name: f.read_bytes() for f in sorted((pathlib.Path(FRAMES) / job).glob("f_*.jpg"))}
+
+
+@app.local_entrypoint()
+def walk(variant: str = "wa", job: str = "walk_wa", res: str = "1280x720", samples: int = 40, chunks: int = 6,
+         total: int = 321, probe: str = "", encode_only: bool = False, labels: str = ""):
+    """--probe 1:321:80 renders every 80th frame in one container to measure the cost per frame"""
+    dst = HERE / "out"; dst.mkdir(exist_ok=True)
+    if probe:
+        r = walk_chunk.remote(job + "_probe", variant, probe, res, samples)
+        print("[probe]", r)
+        for name, data in walk_fetch.remote(job + "_probe").items():
+            (dst / f"probe_{name}").write_bytes(data)
+        return
+    if not encode_only:
+        step = -(-total // chunks)
+        args = [(job, variant, f"{a}:{min(total, a + step - 1)}", res, samples) for a in range(1, total + 1, step)]
+        t0 = time.time()
+        for r in walk_chunk.starmap(args):
+            print(f"[chunk] {r['frames']} in {r['seconds']} s", flush=True)
+        print(f"[render] wall {round(time.time() - t0)} s")
+    lab = json.loads(labels) if labels else []
+    r = walk_encode.remote(job, lab)
+    (dst / f"{job}.mp4").write_bytes(r["mp4"]); (dst / f"{job}_native.mp4").write_bytes(r["mp4_12"])
+    print(f"[encode] {r['frames']} frames {r['size']} -> {dst / (job + '.mp4')}")
