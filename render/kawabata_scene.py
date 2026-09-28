@@ -37,8 +37,8 @@ ap.add_argument("--frames", default="", help="animation: first:last frame (shot 
 ap.add_argument("--outdir", default="", help="animation: directory for frame PNGs")
 A = ap.parse_args(argv)
 TEX = os.path.join(A.assets, "textures")
-NIGHT = A.shot == "reopen"
-MODERN = A.shot in ("reopen",)
+NIGHT = A.shot in ("reopen", "night")
+MODERN = A.shot in ("reopen", "night")
 ANIM = bool(A.frames)
 FPS, FRAMES_TOTAL = 30, 750
 rng = random.Random(1937)
@@ -186,6 +186,27 @@ def emission(name, color, strength):
     e = nt.nodes.new("ShaderNodeEmission"); e.inputs["Color"].default_value = (*color, 1); e.inputs["Strength"].default_value = strength
     nt.links.new(e.outputs[0], nt.nodes["Material Output"].inputs["Surface"])
     return m
+
+
+def clip_x(mats, lim):
+    """Make a material transparent where |world x| > lim, so moving traffic vanishes past the bridge ends."""
+    for m in mats:
+        nt = m.node_tree; out = nt.nodes["Material Output"]
+        link = out.inputs["Surface"].links[0]; src = link.from_socket; nt.links.remove(link)
+        geo = nt.nodes.new("ShaderNodeNewGeometry"); sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+        ab = nt.nodes.new("ShaderNodeMath"); ab.operation = "ABSOLUTE"
+        gt = nt.nodes.new("ShaderNodeMath"); gt.operation = "GREATER_THAN"; gt.inputs[1].default_value = lim
+        tr = nt.nodes.new("ShaderNodeBsdfTransparent"); mix = nt.nodes.new("ShaderNodeMixShader")
+        nt.links.new(geo.outputs["Position"], sep.inputs[0]); nt.links.new(sep.outputs["X"], ab.inputs[0])
+        nt.links.new(ab.outputs[0], gt.inputs[0]); nt.links.new(gt.outputs[0], mix.inputs[0])
+        nt.links.new(src, mix.inputs[1]); nt.links.new(tr.outputs[0], mix.inputs[2])
+        nt.links.new(mix.outputs[0], out.inputs["Surface"])
+
+
+def ramp(socket_owner, prop, frames_values):
+    """Keyframe a property (light energy, node input default_value) through (frame, value) pairs, linear."""
+    for f, v in frames_values:
+        setattr(socket_owner, prop, v); socket_owner.keyframe_insert(prop, frame=f)
 
 
 WATER_MAP = []
@@ -1036,20 +1057,29 @@ def flags(deck):
             obj("flags_w", wht, flat("flagwhite", (0.9, 0.9, 0.86), 0.8))]
 
 
-def cars_on_new_bridge(n):
-    body, head, tail = bmesh.new(), bmesh.new(), bmesh.new()
+def cars_on_new_bridge(n, travel=0.0):
+    """Traffic on the new bridge. With `travel` > 0 each direction is one group that drives `travel` metres over
+    the clip: cars are seeded over a longer stretch and made invisible past the deck ends (clip_x)."""
     cols = [(0.8, 0.8, 0.8), (0.05, 0.05, 0.06), (0.6, 0.6, 0.62), (0.5, 0.05, 0.05), (0.1, 0.2, 0.4), (0.85, 0.7, 0.1)]
-    mats = [flat(f"car{i}", c, 0.25, 0.4) for i, c in enumerate(cols)] + [MAT["glass"]]
-    for i in range(n):
-        lane = rng.choice([-5.7, -1.9, 1.9, 5.7]); d = 1 if lane > 0 else -1
-        x = rng.uniform(-240, 240); y = NB_C + lane; c = rng.randrange(6)
-        add_box(body, (x, y, NB_Y + 0.62), (4.4, 1.8, 0.75), mat_index=c)
-        add_box(body, (x - 0.2 * d, y, NB_Y + 1.28), (2.3, 1.62, 0.6), mat_index=6)
-        add_box(head, (x + d * 2.22, y, NB_Y + 0.7), (0.05, 1.4, 0.16))
-        add_box(tail, (x - d * 2.22, y, NB_Y + 0.75), (0.05, 1.4, 0.14))
-    obj("cars", body, mats, bevel=0.08)
-    obj("headl", head, emission("head", (1.0, 0.95, 0.85), 30.0 if NIGHT else 0.5))
-    obj("taill", tail, emission("tail", (1.0, 0.08, 0.04), 18.0 if NIGHT else 0.3))
+    mats = [flat(f"car{i}", c, 0.25, 0.4) for i, c in enumerate(cols)] + [MAT["glass"].copy() if travel else MAT["glass"]]
+    hm = emission("head", (1.0, 0.95, 0.85), 30.0 if NIGHT else 0.5)
+    tm = emission("tail", (1.0, 0.08, 0.04), 18.0 if NIGHT else 0.3)
+    if travel:
+        clip_x(mats + [hm, tm], 256.0)
+    groups = []
+    for d in ((1, -1) if travel else (0,)):
+        body, head, tail = bmesh.new(), bmesh.new(), bmesh.new()
+        lanes = [-5.7, -1.9, 1.9, 5.7] if d == 0 else ([1.9, 5.7] if d > 0 else [-5.7, -1.9])
+        lo, hi = (-240, 240) if d == 0 else ((-240 - travel, 240) if d > 0 else (-240, 240 + travel))
+        for i in range(int(n * (hi - lo) / 480 / (1 if d == 0 else 2))):
+            lane = rng.choice(lanes); dd = 1 if lane > 0 else -1
+            x = rng.uniform(lo, hi); y = NB_C + lane; c = rng.randrange(6)
+            add_box(body, (x, y, NB_Y + 0.62), (4.4, 1.8, 0.75), mat_index=c)
+            add_box(body, (x - 0.2 * dd, y, NB_Y + 1.28), (2.3, 1.62, 0.6), mat_index=6)
+            add_box(head, (x + dd * 2.22, y, NB_Y + 0.7), (0.05, 1.4, 0.16))
+            add_box(tail, (x - dd * 2.22, y, NB_Y + 0.75), (0.05, 1.4, 0.14))
+        groups.append((d, [obj("cars", body, mats, bevel=0.08), obj("headl", head, hm), obj("taill", tail, tm)]))
+    return groups
 
 
 def light(kind, loc, energy, color, rot=None, size=0.3, spot=None):
@@ -1188,8 +1218,24 @@ if A.shot in ("open", "build"):
 else:
     build_city(); tick('city')
     lamp_pts = build_new_bridge(); tick('new bridge')
-    cars_on_new_bridge(44)
-    people_on_deck(deck, 60, "new")
+    if A.shot == "night":
+        # traffic keeps flowing (~32 km/h); strollers drift both ways on the reopened footbridge (~1 m/s)
+        for d, objs in cars_on_new_bridge(44, travel=220.0):
+            for o in objs:
+                key(o, 1, location=(0, 0, 0)); key(o, FRAMES_TOTAL, location=(d * 220.0, 0, 0))
+        walkers = []
+        for dx in (24.0, -24.0):
+            o = people_on_deck(deck, 30, "new"); walkers.append(o)
+            key(o, 1, location=(0, 0, 0)); key(o, FRAMES_TOTAL, location=(dx, 0, 0))
+        clip_x({m for o in walkers for m in o.data.materials}, L0 / 2 - 1.0)
+        for o in bpy.data.objects:
+            if o.animation_data and o.animation_data.action and o.name.startswith(("cars", "headl", "taill", "people")):
+                for fc in o.animation_data.action.fcurves:
+                    for kp in fc.keyframe_points:
+                        kp.interpolation = "LINEAR"
+    else:
+        cars_on_new_bridge(44)
+        people_on_deck(deck, 60, "new")
 
     def place_park():
         x = rng.choice([-1, 1]) * rng.uniform(W_RIVER + 8, W_RIVER + 62); y = rng.uniform(-1500, 1500)
@@ -1199,39 +1245,68 @@ else:
     scatter_trees(protos, 900, place_park)
     world_hdri("qwantani_night_puresky", 0.1)
     sun(-128, 25, 0.06, (0.7, 0.78, 1.0))    # moonlight
+    pier_lights, arch_lights = [], []
     # 投射燈：lights at every pier base, pointing up the columns and toward the new bridge
     for px in PIERS:
+        grp = []
         for sy in (-1, 1):
             # spots point down -Z by default; rotation_x = pi + tilt aims them up, leaning in toward the columns
             up = (math.pi + sy * math.radians(10), 0, 0)
-            light("SPOT", (px + 1.4, sy * 3.3, 0.5), 900, (1.0, 0.7, 0.42), rot=up, size=0.2, spot=(math.radians(70), 0.6))
-            light("SPOT", (px - 1.4, sy * 3.3, 0.5), 900, (1.0, 0.7, 0.42), rot=up, size=0.2, spot=(math.radians(70), 0.6))
+            grp.append(light("SPOT", (px + 1.4, sy * 3.3, 0.5), 900, (1.0, 0.7, 0.42), rot=up, size=0.2, spot=(math.radians(70), 0.6)))
+            grp.append(light("SPOT", (px - 1.4, sy * 3.3, 0.5), 900, (1.0, 0.7, 0.42), rot=up, size=0.2, spot=(math.radians(70), 0.6)))
         # a flood from each pier cap thrown across onto the new bridge's girders (downstream = -y)
-        light("SPOT", (px, -3.6, Y_CAP + RAISE + 0.2), 700, (1.0, 0.8, 0.55), rot=(math.pi + math.radians(75), 0, 0), size=0.2, spot=(math.radians(40), 0.7))
+        grp.append(light("SPOT", (px, -3.6, Y_CAP + RAISE + 0.2), 700, (1.0, 0.8, 0.55), rot=(math.pi + math.radians(75), 0, 0), size=0.2, spot=(math.radians(40), 0.7)))
+        pier_lights.append((px, grp))
     # soft floods from the deck onto the arch ribs
     for k in range(1, 10):
         t = k / 10
         x = -107.5 + 215 * t
         # from the upstream deck edge, tilted toward the rib so its camera-facing side is lit
         lean = math.atan2(8.5 * math.sin(math.pi * t) + 1.0, 42.0)
-        light("SPOT", (x, NB_C + NB_W / 2 - 0.6, NB_Y + 0.6), 3200, (0.86, 0.93, 1.0), rot=(math.pi + lean, 0, 0), size=0.4, spot=(math.radians(34), 0.5))
+        arch_lights.append(light("SPOT", (x, NB_C + NB_W / 2 - 0.6, NB_Y + 0.6), 3200, (0.86, 0.93, 1.0), rot=(math.pi + lean, 0, 0), size=0.4, spot=(math.radians(34), 0.5)))
     for (x, y, z) in lamp_pts:
         light("POINT", (x, y, z), 260, (1.0, 0.85, 0.65), size=0.3)
-    haze((0.02, 0.025, 0.04), 0.3)
+    if A.shot == "night":
+        # opening-night lighting: blue hour deepens to night; the pier uplights come on one by one from the
+        # Yonghe (camera) end, then the railing LEDs, then the arch floods and its 琴弦 LED strip
+        wn = world.node_tree.nodes
+        tint = wn.new("ShaderNodeMixRGB"); tint.blend_type = "MULTIPLY"; tint.inputs["Fac"].default_value = 1.0
+        world.node_tree.links.new(wn["Environment Texture"].outputs["Color"], tint.inputs["Color1"])
+        world.node_tree.links.new(tint.outputs["Color"], wn["Background"].inputs["Color"])
+        ramp(tint.inputs["Color2"], "default_value", ((1, (0.55, 0.72, 1.15, 1)), (300, (1, 1, 1, 1))))   # blue hour → night
+        ramp(wn["Background"].inputs["Strength"], "default_value", ((1, 0.32), (300, 0.1)))
+        for rank, (px, grp) in enumerate(sorted(pier_lights, key=lambda t: -t[0])):
+            f = 60 + rank * 9
+            for o in grp:
+                e = o.data.energy; ramp(o.data, "energy", ((f, 0.0), (f + 10, e)))
+        led = bpy.data.materials["led"].node_tree.nodes["Emission"].inputs["Strength"]
+        ramp(led, "default_value", ((185, 0.0), (215, 18.0)))
+        for k, o in enumerate(arch_lights):
+            e = o.data.energy; ramp(o.data, "energy", ((250 + k * 4, 0.0), (270 + k * 4, e)))
+        aled = bpy.data.materials["archled"].node_tree.nodes["Emission"].inputs["Strength"]
+        ramp(aled, "default_value", ((265, 0.0), (300, 26.0)))
+    haze((0.02, 0.025, 0.04), 0.3, passes=not ANIM)
     cam = ((120, 40, 5.5), (-20, -6, 14.5), 20)
 
 if A.cam:
     v = [float(t) for t in A.cam.split(",")]
     cam = (tuple(v[0:3]), tuple(v[3:6]), v[6] if len(v) > 6 else 30)
 camera(*cam)
-if A.shot == "build":
-    # camera path: wide establishing → along the piers → close on the girders → the opening-day composition
+CAM_PATHS = {
+    # wide establishing → along the piers → close on the girders → the opening-day composition
+    "build": ((1, (240, -150, 30), (40, 0, 3), 28), (230, (128, -100, 15), (-10, 0, 3.5), 28),
+              (400, (70, -34, 11), (-40, 0, 7.5), 28), (520, (95, -44, 9), (-10, 2, 7.5), 28),
+              (FRAMES_TOTAL, (150, -52, 6.5), (30, 2, 6.5), 28)),
+    # high over the river from upstream as the lights come on → low beside the lit piers → the reopening composition
+    "night": ((1, (30, 360, 80), (-10, -20, 6), 28), (250, (70, 130, 24), (-15, -18, 9), 26),
+              (480, (75, 20, 4.5), (-70, -14, 12), 22), (FRAMES_TOTAL, (120, 40, 5.5), (-20, -6, 14.5), 20)),
+}
+if A.shot in CAM_PATHS and not A.cam:
     c = sc.camera; tgt = bpy.data.objects.new("cam_target", None); COLL.objects.link(tgt)
     tc = c.constraints.new("TRACK_TO"); tc.target = tgt; tc.track_axis = "TRACK_NEGATIVE_Z"; tc.up_axis = "UP_Y"
-    for f, loc, look in ((1, (240, -150, 30), (40, 0, 3)), (230, (128, -100, 15), (-10, 0, 3.5)),
-                         (400, (70, -34, 11), (-40, 0, 7.5)), (520, (95, -44, 9), (-10, 2, 7.5)),
-                         (FRAMES_TOTAL, (150, -52, 6.5), (30, 2, 6.5))):
+    for f, loc, look, lens in CAM_PATHS[A.shot]:
         key(c, f, location=loc); key(tgt, f, location=look)
+        c.data.lens = lens; c.data.keyframe_insert("lens", frame=f)
     for mp in WATER_MAP:  # drifting ripples
         mp.inputs["Location"].default_value = (0, 0, 0); mp.inputs["Location"].keyframe_insert("default_value", frame=1)
         mp.inputs["Location"].default_value = (6.0, 1.5, 0); mp.inputs["Location"].keyframe_insert("default_value", frame=FRAMES_TOTAL)
