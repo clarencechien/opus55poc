@@ -1269,8 +1269,12 @@ else:
     if A.shot == "night":
         # opening-night lighting: blue hour deepens to night; the pier uplights come on one by one from the
         # Yonghe (camera) end, then the railing LEDs, then the arch floods and its 琴弦 LED strip
-        bg = world.node_tree.nodes["Background"].inputs["Strength"]
-        ramp(bg, "default_value", ((1, 0.55), (300, 0.1)))
+        wn = world.node_tree.nodes
+        tint = wn.new("ShaderNodeMixRGB"); tint.blend_type = "MULTIPLY"; tint.inputs["Fac"].default_value = 1.0
+        world.node_tree.links.new(wn["Environment Texture"].outputs["Color"], tint.inputs["Color1"])
+        world.node_tree.links.new(tint.outputs["Color"], wn["Background"].inputs["Color"])
+        ramp(tint.inputs["Color2"], "default_value", ((1, (0.55, 0.72, 1.15, 1)), (300, (1, 1, 1, 1))))   # blue hour → night
+        ramp(wn["Background"].inputs["Strength"], "default_value", ((1, 0.32), (300, 0.1)))
         for rank, (px, grp) in enumerate(sorted(pier_lights, key=lambda t: -t[0])):
             f = 60 + rank * 9
             for o in grp:
@@ -1294,7 +1298,7 @@ CAM_PATHS = {
               (400, (70, -34, 11), (-40, 0, 7.5), 28), (520, (95, -44, 9), (-10, 2, 7.5), 28),
               (FRAMES_TOTAL, (150, -52, 6.5), (30, 2, 6.5), 28)),
     # high over the river from upstream as the lights come on → low beside the lit piers → the reopening composition
-    "night": ((1, (330, 240, 75), (-10, -20, 10), 28), (250, (190, 95, 22), (-20, -15, 10), 26),
+    "night": ((1, (30, 360, 80), (-10, -20, 6), 28), (250, (70, 130, 24), (-15, -18, 9), 26),
               (480, (75, 20, 4.5), (-70, -14, 12), 22), (FRAMES_TOTAL, (120, 40, 5.5), (-20, -6, 14.5), 20)),
 }
 if A.shot in CAM_PATHS and not A.cam:
