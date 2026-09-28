@@ -86,6 +86,7 @@ world = bpy.data.worlds.new("world"); sc.world = world
 vl = sc.view_layers[0]
 vl.use_pass_mist = True
 vl.use_pass_z = True
+vl.use_pass_object_index = True
 world.mist_settings.start, world.mist_settings.depth, world.mist_settings.falloff = (180.0, 3800.0, "QUADRATIC")
 
 
@@ -988,6 +989,23 @@ def haze(color, amount):
     comp = nt.nodes.new("CompositorNodeComposite")
     nt.links.new(rl.outputs["Mist"], mul.inputs[0]); nt.links.new(mul.outputs[0], mix.inputs[0])
     nt.links.new(rl.outputs["Image"], mix.inputs[1]); nt.links.new(mix.outputs[0], comp.inputs["Image"])
+    # depth for the AI polish pass: 1 = near (3 m), 0 = far (≥ 3 km) or sky, log scale
+    chain = rl.outputs["Depth"]
+    for op, v in (("MAXIMUM", 3.0), ("DIVIDE", 3.0), ("LOGARITHM", math.e), ("DIVIDE", math.log(1000.0))):
+        n = nt.nodes.new("CompositorNodeMath"); n.operation = op; n.inputs[1].default_value = v
+        nt.links.new(chain, n.inputs[0]); chain = n.outputs[0]
+    inv = nt.nodes.new("CompositorNodeMath"); inv.operation = "SUBTRACT"; inv.use_clamp = True; inv.inputs[0].default_value = 1.0
+    nt.links.new(chain, inv.inputs[1])
+    fo = nt.nodes.new("CompositorNodeOutputFile")
+    fo.base_path = os.path.dirname(os.path.abspath(A.out))
+    fo.format.file_format = "PNG"; fo.format.color_mode = "BW"; fo.format.color_depth = "16"
+    fo.file_slots[0].path = os.path.splitext(os.path.basename(A.out))[0] + "_depth"
+    nt.links.new(inv.outputs[0], fo.inputs[0])
+    # structure mask (both bridges) so the AI polish can treat them gently
+    idm = nt.nodes.new("CompositorNodeIDMask"); idm.index = 1; idm.use_antialiasing = True
+    nt.links.new(rl.outputs["IndexOB"], idm.inputs[0])
+    fo.file_slots.new(os.path.splitext(os.path.basename(A.out))[0] + "_mask")
+    nt.links.new(idm.outputs[0], fo.inputs[1])
 
 
 # ============================================================== shots
@@ -1060,6 +1078,9 @@ camera(*cam)
 os.makedirs(os.path.dirname(os.path.abspath(A.out)), exist_ok=True)
 sc.render.filepath = os.path.abspath(A.out)
 print("objects:", len(bpy.data.objects), "rendering", A.shot, A.res, A.samples)
+for o in bpy.data.objects:
+    if o.name.startswith(("kb_", "nb_")):
+        o.pass_index = 1
 tick('scene built')
 bpy.ops.render.render(write_still=True)
 tick('rendered')
