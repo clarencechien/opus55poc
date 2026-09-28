@@ -23,7 +23,7 @@ def tick(msg):
 
 import bmesh
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
@@ -33,10 +33,14 @@ ap.add_argument("--out", default="out/open.png")
 ap.add_argument("--res", default="1920x1080")
 ap.add_argument("--samples", type=int, default=256)
 ap.add_argument("--cam", default="", help="override camera: x,y,z,tx,ty,tz,lens")
+ap.add_argument("--frames", default="", help="animation: first:last frame (shot 'build')")
+ap.add_argument("--outdir", default="", help="animation: directory for frame PNGs")
 A = ap.parse_args(argv)
 TEX = os.path.join(A.assets, "textures")
 NIGHT = A.shot == "reopen"
 MODERN = A.shot in ("reopen",)
+ANIM = bool(A.frames)
+FPS, FRAMES_TOTAL = 30, 750
 rng = random.Random(1937)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -184,6 +188,9 @@ def emission(name, color, strength):
     return m
 
 
+WATER_MAP = []
+
+
 def water_mat():
     m = bpy.data.materials.new("water"); m.use_nodes = True
     nt = m.node_tree; N = nt.nodes.new; L = nt.links.new
@@ -194,6 +201,7 @@ def water_mat():
     geo = N("ShaderNodeNewGeometry")
     mp = N("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (1.1, 0.35, 1.0)
     L(geo.outputs["Position"], mp.inputs["Vector"])
+    WATER_MAP.append(mp)
     n1 = N("ShaderNodeTexNoise"); n1.inputs["Scale"].default_value = 1.0; n1.inputs["Detail"].default_value = 8
     L(mp.outputs["Vector"], n1.inputs["Vector"])
     n2 = N("ShaderNodeTexNoise"); n2.inputs["Scale"].default_value = 0.04; n2.inputs["Detail"].default_value = 3
@@ -325,6 +333,7 @@ MAT.update(
     brick=pbr("brick", "red_brick_03", size=2.0, tint=(1.0, 0.9, 0.85), bright=0.95, sat=0.9, streak=0.2),
     timber=pbr("timber", "brown_planks_05", size=2.0, tint=(0.55, 0.45, 0.35), bright=0.8, sat=0.7),
     dark=flat("dark", (0.03, 0.03, 0.03), 0.3),
+    rope=flat("rope", (0.3, 0.26, 0.2), 0.9),
     glass=flat("glass", (0.02, 0.025, 0.03), 0.05, 0.0),
 )
 
@@ -350,6 +359,13 @@ def obj(name, bm, mat, bevel=0.0, smooth=False):
     if bevel > 0:
         md = o.modifiers.new("bevel", "BEVEL"); md.width = bevel; md.segments = 2
         md.limit_method = "ANGLE"; md.angle_limit = math.radians(40)
+    return o
+
+
+def recenter(o, origin):
+    """Move an object's origin to `origin` (mesh stays in place) so it can scale/move around that point."""
+    origin = Vector(origin)
+    o.data.transform(Matrix.Translation(-origin)); o.location = origin
     return o
 
 
@@ -449,25 +465,78 @@ Y_CAP, Y_DECK = 7.4, 9.3
 RAISE = 1.5 if MODERN else 0.0
 
 
+def pier_into(bm, px):
+    """雙柱式拱型鏤空橋墩: footing, twin round columns joined by an arch, cap and cornice."""
+    add_box(bm, (px, 0, -2.4), (3.6, 8.6, 3.2))
+    add_box(bm, (px, 0, -0.45), (2.8, 7.0, 0.9))
+    for sy in (-1, 1):
+        add_cyl(bm, (px, sy * 2.15, -4.0), 1.0, 10.2, seg=28)
+    arc = [(1.15 * math.cos(math.pi - math.pi * k / 16), 4.0 + 1.15 * math.sin(math.pi - math.pi * k / 16)) for k in range(17)]
+    # the arched wall is split at the crown into two simple polygons
+    add_prism(bm, [(-2.15, 2.0), (-1.15, 2.0)] + arc[:9] + [(0.0, 6.2), (-2.15, 6.2)], px - 0.75, px + 0.75)
+    add_prism(bm, [(0.0, 6.2)] + arc[8:] + [(1.15, 2.0), (2.15, 2.0), (2.15, 6.2)], px - 0.75, px + 0.75)
+    add_box(bm, (px, 0, 6.8), (2.1, 6.0, 1.2))
+    add_box(bm, (px, 0, 6.25), (2.3, 6.3, 0.18))
+
+
+def girders_into(bm, i, z0):
+    """One span of riveted deck plate girders with cross frames (上承式鋼鈑梁)."""
+    H = 1.5
+    xa, xb = X0 + i * SPAN + 0.15, X0 + (i + 1) * SPAN - 0.15
+    L = xb - xa; xm = (xa + xb) / 2
+    for gy in (-1.9, 1.9):
+        add_box(bm, (xm, gy, z0 + H / 2), (L, 0.04, H))
+        add_box(bm, (xm, gy, z0 + H - 0.035), (L, 0.46, 0.07))
+        add_box(bm, (xm, gy, z0 + 0.035), (L, 0.46, 0.07))
+        for sx in (-1, 1):  # angle-iron flange cover lines
+            add_box(bm, (xm, gy + sx * 0.05, z0 + H - 0.12), (L, 0.06, 0.08))
+        n = int(L / 1.3)
+        for k in range(n + 1):
+            x = xa + k * L / n
+            for sx in (-1, 1):
+                add_box(bm, (x, gy + sx * 0.08, z0 + H / 2), (0.1, 0.12, H - 0.16))
+    for k in range(6):
+        x = xa + k * L / 5
+        add_box(bm, (x, 0, z0 + H - 0.2), (0.14, 3.8, 0.16))
+        add_box(bm, (x, 0, z0 + 0.25), (0.14, 3.8, 0.16))
+        add_rod(bm, (x, -1.9, z0 + 0.25), (x, 1.9, z0 + H - 0.2), 0.05, 6)
+        add_rod(bm, (x, 1.9, z0 + 0.25), (x, -1.9, z0 + H - 0.2), 0.05, 6)
+
+
+def slab_into(bm, xa, xb, z0):
+    xm, L = (xa + xb) / 2, xb - xa
+    add_box(bm, (xm, 0, z0 + 1.7), (L, 6.0, 0.4))
+    for s_ in (-1, 1):
+        add_box(bm, (xm, s_ * 3.05, z0 + 1.55), (L, 0.3, 0.7))
+
+
+def rail_into(bm, xa, xb, deck):
+    xm, L = (xa + xb) / 2, xb - xa
+    n = max(1, int(round(L / 2.1)))
+    for s_ in (-1, 1):
+        y = s_ * 2.85
+        for k in range(n + 1):
+            add_box(bm, (xa + k * L / n, y, deck + 0.5), (0.22, 0.22, 1.0))
+        add_box(bm, (xm, y, deck + 1.02), (L, 0.28, 0.16))
+        add_box(bm, (xm, y, deck + 0.55), (L, 0.12, 0.1))
+
+
+def name_posts_into(bm, deck):  # 親柱
+    for s_ in (-1, 1):
+        y = s_ * 2.85
+        for ex in (-1, 1):
+            add_box(bm, (ex * (L0 / 2 + 0.1), y + s_ * 0.4, deck + 1.3), (0.9, 0.9, 2.6))
+            add_box(bm, (ex * (L0 / 2 + 0.1), y + s_ * 0.4, deck + 2.7), (1.1, 1.1, 0.3))
+
+
 def build_kawabata():
-    # --- piers: twin round columns joined by an arch, cap and cornice (雙柱式拱型鏤空橋墩)
     bm = bmesh.new()
     for px in PIERS:
-        add_box(bm, (px, 0, -2.4), (3.6, 8.6, 3.2))
-        add_box(bm, (px, 0, -0.45), (2.8, 7.0, 0.9))
-        for sy in (-1, 1):
-            add_cyl(bm, (px, sy * 2.15, -4.0), 1.0, 10.2, seg=28)
-        arc = [(1.15 * math.cos(math.pi - math.pi * k / 16), 4.0 + 1.15 * math.sin(math.pi - math.pi * k / 16)) for k in range(17)]
-        # the arched wall is split at the crown into two simple polygons
-        add_prism(bm, [(-2.15, 2.0), (-1.15, 2.0)] + arc[:9] + [(0.0, 6.2), (-2.15, 6.2)], px - 0.75, px + 0.75)
-        add_prism(bm, [(0.0, 6.2)] + arc[8:] + [(1.15, 2.0), (2.15, 2.0), (2.15, 6.2)], px - 0.75, px + 0.75)
-        add_box(bm, (px, 0, 6.8), (2.1, 6.0, 1.2))
-        add_box(bm, (px, 0, 6.25), (2.3, 6.3, 0.18))
+        pier_into(bm, px)
     obj("kb_piers", bm, MAT["pier"], bevel=0.05)
-    # abutments
     bm = bmesh.new()
-    for s in (-1, 1):
-        add_box(bm, (s * (L0 / 2 + 3.4), 0, 3.0), (7.0, 7.6, 12.0))
+    for s_ in (-1, 1):
+        add_box(bm, (s_ * (L0 / 2 + 3.4), 0, 3.0), (7.0, 7.6, 12.0))
     obj("kb_abut", bm, MAT["stone"], bevel=0.06)
     if RAISE:
         bm = bmesh.new()
@@ -475,58 +544,114 @@ def build_kawabata():
             add_box(bm, (px, 0, Y_CAP + RAISE / 2), (1.9, 5.8, RAISE))
         obj("kb_pedestal", bm, MAT["pedestal"], bevel=0.03)
     z0 = Y_CAP + RAISE
-    # --- riveted deck plate girders, cross frames, lateral bracing (上承式鋼鈑梁)
     bm = bmesh.new()
-    H = 1.5
     for i in range(NS):
-        xa, xb = X0 + i * SPAN + 0.15, X0 + (i + 1) * SPAN - 0.15
-        L = xb - xa; xm = (xa + xb) / 2
-        for gy in (-1.9, 1.9):
-            add_box(bm, (xm, gy, z0 + H / 2), (L, 0.04, H))
-            add_box(bm, (xm, gy, z0 + H - 0.035), (L, 0.46, 0.07))
-            add_box(bm, (xm, gy, z0 + 0.035), (L, 0.46, 0.07))
-            for sx in (-1, 1):  # angle-iron flange cover lines
-                add_box(bm, (xm, gy + sx * 0.05, z0 + H - 0.12), (L, 0.06, 0.08))
-            n = int(L / 1.3)
-            for k in range(n + 1):
-                x = xa + k * L / n
-                for sx in (-1, 1):
-                    add_box(bm, (x, gy + sx * 0.08, z0 + H / 2), (0.1, 0.12, H - 0.16))
-        for k in range(6):
-            x = xa + k * L / 5
-            add_box(bm, (x, 0, z0 + H - 0.2), (0.14, 3.8, 0.16))
-            add_box(bm, (x, 0, z0 + 0.25), (0.14, 3.8, 0.16))
-            add_rod(bm, (x, -1.9, z0 + 0.25), (x, 1.9, z0 + H - 0.2), 0.05, 6)
-            add_rod(bm, (x, 1.9, z0 + 0.25), (x, -1.9, z0 + H - 0.2), 0.05, 6)
+        girders_into(bm, i, z0)
     obj("kb_girders", bm, MAT["girder"], bevel=0.008)
-    # --- deck slab + edge beams
-    bm = bmesh.new()
-    add_box(bm, (0, 0, z0 + 1.7), (L0 + 1, 6.0, 0.4))
-    for s in (-1, 1):
-        add_box(bm, (0, s * 3.05, z0 + 1.55), (L0 + 1, 0.3, 0.7))
+    bm = bmesh.new(); slab_into(bm, X0 - 0.5, -X0 + 0.5, z0)
     obj("kb_slab", bm, MAT["slab"], bevel=0.03)
     deck = z0 + 1.9
-    # --- railings: concrete posts + top and mid rails (1937) / replica (2026)
-    bm = bmesh.new()
-    n = int(L0 / 2.1)
-    for s in (-1, 1):
-        y = s * 2.85
-        for k in range(n + 1):
-            add_box(bm, (X0 + k * L0 / n, y, deck + 0.5), (0.22, 0.22, 1.0))
-        add_box(bm, (0, y, deck + 1.02), (L0, 0.28, 0.16))
-        add_box(bm, (0, y, deck + 0.55), (L0, 0.12, 0.1))
-        for ex in (-1, 1):  # 親柱 name posts
-            add_box(bm, (ex * (L0 / 2 + 0.1), y + s * 0.4, deck + 1.3), (0.9, 0.9, 2.6))
-            add_box(bm, (ex * (L0 / 2 + 0.1), y + s * 0.4, deck + 2.7), (1.1, 1.1, 0.3))
+    bm = bmesh.new(); rail_into(bm, X0, -X0, deck); name_posts_into(bm, deck)
     obj("kb_rail", bm, MAT["rail_new"] if MODERN else MAT["rail_old"], bevel=0.03)
     if MODERN:
         bm = bmesh.new()
         add_box(bm, (0, 0, deck + 0.05), (L0, 5.3, 0.1))
         obj("kb_wood", bm, MAT["wood"], bevel=0.01)
         bm = bmesh.new()
-        for s in (-1, 1):
-            add_box(bm, (0, s * 2.68, deck + 0.92), (L0, 0.05, 0.05))
+        for s_ in (-1, 1):
+            add_box(bm, (0, s_ * 2.68, deck + 0.92), (L0, 0.05, 0.05))
         obj("kb_led", bm, emission("led", (1.0, 0.78, 0.5), 18.0))
+    return deck
+
+
+# ---------------------------------------------------------------- animation (1935–1937 construction)
+def key(o, frame, **props):
+    for k, v in props.items():
+        setattr(o, k, v)
+        o.keyframe_insert(k, frame=frame)
+
+
+def show_at(o, frame):
+    """Hidden before `frame`, visible from it (constant keys)."""
+    o.hide_render = True; o.keyframe_insert("hide_render", frame=1)
+    o.hide_render = False; o.keyframe_insert("hide_render", frame=frame)
+    o.hide_render = True if frame > 1 else False
+
+
+def hide_at(o, frame):
+    o.hide_render = False; o.keyframe_insert("hide_render", frame=frame - 1)
+    o.hide_render = True; o.keyframe_insert("hide_render", frame=frame)
+
+
+def scaffold_into(bm, px):
+    """Timber falsework around a pier under construction."""
+    for sx in (-2.3, 2.3):
+        for sy in (-5.0, -2.2, 2.2, 5.0):
+            add_box(bm, (px + sx, sy, 2.2), (0.16, 0.16, 12.8))
+    for z in (-0.2, 2.0, 4.2, 6.4, 8.4):
+        for sx in (-2.3, 2.3):
+            add_box(bm, (px + sx, 0, z), (0.12, 10.2, 0.12))
+        for sy in (-5.0, 5.0):
+            add_box(bm, (px, sy, z), (4.7, 0.12, 0.12))
+        add_box(bm, (px, -5.0, z + 0.06), (4.7, 0.9, 0.05))   # walkway planks
+    for sy in (-5.0, 5.0):  # diagonal bracing
+        add_rod(bm, (px - 2.3, sy, -0.2), (px + 2.3, sy, 4.2), 0.05, 5)
+        add_rod(bm, (px + 2.3, sy, 4.2), (px - 2.3, sy, 8.4), 0.05, 5)
+
+
+def build_kawabata_anim():
+    """Every pier, girder span and deck span is its own object so the construction can be staged."""
+    T = {}
+    bm = bmesh.new()
+    for s_ in (-1, 1):
+        add_box(bm, (s_ * (L0 / 2 + 3.4), 0, 3.0), (7.0, 7.6, 12.0))
+    obj("kb_abut", bm, MAT["stone"], bevel=0.06)
+    z0 = Y_CAP; deck = z0 + 1.9
+    # built from the Taipei (camera) end outward so the growth reads in the establishing shot
+    for i, px in enumerate(PIERS):
+        f0 = 16 + (NS - 2 - i) * 13
+        sc_ = bmesh.new(); scaffold_into(sc_, px)
+        so = recenter(obj(f"kb_scaffold{i}", sc_, MAT["timber"]), (px, 0, -4.2))
+        show_at(so, f0); key(so, f0, scale=(1, 1, 0.01)); key(so, f0 + 28, scale=(1, 1, 1))
+        hide_at(so, 250 + (NS - 1 - i) * 15 + 46)             # struck once both girders on it have landed
+        bm = bmesh.new(); pier_into(bm, px)
+        po = recenter(obj(f"kb_pier{i}", bm, MAT["pier"], bevel=0.05), (px, 0, -4.2))
+        show_at(po, f0 + 10); key(po, f0 + 10, scale=(1, 1, 0.02)); key(po, f0 + 52, scale=(1, 1, 1))
+    for i in range(NS):
+        f0 = 250 + (NS - 1 - i) * 15
+        xa, xb = X0 + i * SPAN, X0 + (i + 1) * SPAN
+        bm = bmesh.new(); girders_into(bm, i, z0)
+        xm = X0 + (i + 0.5) * SPAN
+        go = recenter(obj(f"kb_girder{i}", bm, MAT["girder"], bevel=0.008), (xm, 0, z0))
+        show_at(go, f0); key(go, f0, location=(xm, 0, z0 + 9)); key(go, f0 + 44, location=(xm, 0, z0))   # lowered by derrick
+        # timber gin-pole derricks at both span ends, with hoist ropes paying out as the girders go down
+        bm = bmesh.new(); top = z0 + 15.0
+        for ex in (xa + 1.2, xb - 1.2):
+            for sy in (-3.4, 3.4):
+                add_box(bm, (ex, sy, (z0 - 1.0 + top) / 2), (0.28, 0.28, top - z0 + 1.0))
+            add_box(bm, (ex, 0, top), (0.3, 7.4, 0.3))
+            add_rod(bm, (ex, -3.4, z0 + 2), (ex, 3.4, top - 1.5), 0.08, 5)
+        der = obj(f"kb_derrick{i}", bm, MAT["timber"])
+        show_at(der, f0 - 12); hide_at(der, f0 + 56)
+        bm = bmesh.new()
+        for ex in (xa + 1.2, xb - 1.2):
+            for sy in (-1.2, 1.2):
+                add_box(bm, (ex, sy, top - 6.0), (0.04, 0.04, 12.0))
+        rope = recenter(obj(f"kb_rope{i}", bm, MAT["rope"]), (xm, 0, top))
+        show_at(rope, f0 - 12); hide_at(rope, f0 + 50)
+        key(rope, f0, scale=(1, 1, (top - z0 - 9 - 0.9) / 12.0)); key(rope, f0 + 44, scale=(1, 1, (top - z0 - 0.9) / 12.0))
+        f1 = 478 + (NS - 1 - i) * 5
+        xa, xb = X0 + i * SPAN, X0 + (i + 1) * SPAN
+        bm = bmesh.new(); slab_into(bm, xa - 0.01, xb + 0.01, z0); rail_into(bm, xa, xb, deck)
+        do = recenter(obj(f"kb_deck{i}", bm, [MAT["slab"]], bevel=0.03), (xm, 0, z0 + 1.5))
+        # railings use the railing material: split by face height
+        do.data.materials.append(MAT["rail_old"])
+        for poly in do.data.polygons:
+            if poly.center.z > 0.45:
+                poly.material_index = 1
+        show_at(do, f1); key(do, f1, scale=(1, 0.02, 1)); key(do, f1 + 20, scale=(1, 1, 1))
+    bm = bmesh.new(); name_posts_into(bm, deck)
+    show_at(obj("kb_posts", bm, MAT["rail_old"], bevel=0.03), 548)
     return deck
 
 
@@ -718,7 +843,9 @@ def build_terrain():
             ring = []
             for k in range(seg):
                 a = 2 * math.pi * k / seg
-                jitter = 1 + 0.22 * math.sin(a * 2 + cx) + 0.1 * math.sin(a * 5 + cy) + 0.05 * math.sin(a * 9 + cx * 0.3)
+                jitter = (0.22 * math.sin(a * 2 + cx) + 0.1 * math.sin(a * 5 + cy) + 0.05 * math.sin(a * 9 + cx * 0.3)
+                          + 0.07 * math.sin(a * 13 + r * 0.9) + 0.04 * math.sin(a * 29 + r * 1.7))   # spurs and gullies
+                jitter = 1 + jitter * min(1.0, r / 5)                   # no dimple at the summit
                 ex = 1.0 + 0.6 * abs(math.cos(a))                     # elongated ridge
                 z = hgt * math.exp(-((r / rings) / ex) ** 2 * 3.0) * jitter - 20 * (r == rings)
                 ring.append(bm.verts.new((cx + rr * math.cos(a), cy + rr * math.sin(a), z)))
@@ -827,8 +954,7 @@ def sampans(spots):
             for v in bm_.verts:
                 if not v.tag:
                     v.co.y += y; v.tag = True
-    obj("sampans", hull, MAT["timber"], bevel=0.02)
-    obj("boatmen", ppl, flat("boatmen", (0.2, 0.19, 0.17), 0.8), smooth=True)
+    return [obj("sampans", hull, MAT["timber"], bevel=0.02), obj("boatmen", ppl, flat("boatmen", (0.2, 0.19, 0.17), 0.8), smooth=True)]
 
 
 def load_trees():
@@ -883,7 +1009,7 @@ def people_on_deck(deck, n, era):
         if era == "old" and rng.random() < 0.5:
             add_cyl(bm, (x, y, deck + 1.66), 0.2, 0.03, seg=12, mat_index=7)
             add_cyl(bm, (x, y, deck + 1.66), 0.11, 0.1, seg=10, mat_index=7)
-    obj("people", bm, mats, smooth=True)
+    return obj("people", bm, mats, smooth=True)
 
 
 def vintage_car(deck, x, y, rot=0.0):
@@ -896,7 +1022,7 @@ def vintage_car(deck, x, y, rot=0.0):
             res = bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=0.38, radius2=0.38, depth=0.16)
             for v in res["verts"]:
                 v.co = Vector((v.co.x, v.co.z, v.co.y)) + Vector((x + wx, y + wy, deck + 0.38))
-    obj("car37", bm, flat("carpaint", (0.03, 0.03, 0.035), 0.25, 0.3), bevel=0.05)
+    return obj("car37", bm, flat("carpaint", (0.03, 0.03, 0.035), 0.25, 0.3), bevel=0.05)
 
 
 def flags(deck):
@@ -906,9 +1032,8 @@ def flags(deck):
             y = s * 2.95
             add_cyl(bm, (x, y, deck + 1.1), 0.03, 2.4, seg=6)
             add_box(red if (x // 16) % 2 else wht, (x + 0.5, y, deck + 3.1), (1.0, 0.02, 0.65))
-    obj("flagpoles", bm, MAT["steel"])
-    obj("flags_r", red, flat("flagred", (0.7, 0.05, 0.05), 0.8))
-    obj("flags_w", wht, flat("flagwhite", (0.9, 0.9, 0.86), 0.8))
+    return [obj("flagpoles", bm, MAT["steel"]), obj("flags_r", red, flat("flagred", (0.7, 0.05, 0.05), 0.8)),
+            obj("flags_w", wht, flat("flagwhite", (0.9, 0.9, 0.86), 0.8))]
 
 
 def cars_on_new_bridge(n):
@@ -978,7 +1103,7 @@ def camera(loc, target, lens):
     COLL.objects.link(o); sc.camera = o
 
 
-def haze(color, amount):
+def haze(color, amount, passes=True):
     sc.use_nodes = True
     nt = sc.node_tree
     for n in list(nt.nodes):
@@ -989,6 +1114,8 @@ def haze(color, amount):
     comp = nt.nodes.new("CompositorNodeComposite")
     nt.links.new(rl.outputs["Mist"], mul.inputs[0]); nt.links.new(mul.outputs[0], mix.inputs[0])
     nt.links.new(rl.outputs["Image"], mix.inputs[1]); nt.links.new(mix.outputs[0], comp.inputs["Image"])
+    if not passes:
+        return
     # depth for the AI polish pass: 1 = near (3 m), 0 = far (≥ 3 km) or sky, log scale
     chain = rl.outputs["Depth"]
     for op, v in (("MAXIMUM", 3.0), ("DIVIDE", 3.0), ("LOGARITHM", math.e), ("DIVIDE", math.log(1000.0))):
@@ -1009,15 +1136,32 @@ def haze(color, amount):
 
 
 # ============================================================== shots
-deck = build_kawabata(); tick('bridge')
+deck = (build_kawabata_anim() if A.shot == "build" else build_kawabata()); tick('bridge')
 build_terrain(); tick('terrain')
 protos = load_trees(); tick('trees loaded')
-if A.shot == "open":
+if A.shot in ("open", "build"):
     build_old_town()
-    people_on_deck(deck, 46, "old")
-    vintage_car(deck, 18, 1.2); vintage_car(deck, -64, -1.2)
-    flags(deck)
-    sampans([(96, -31), (58, -16), (8, 30)])
+    if A.shot == "build":
+        # 1937-03-25 opening: flags, pedestrians and cars appear once the deck is complete
+        crowd_a = people_on_deck(deck, 24, "old"); crowd_b = people_on_deck(deck, 22, "old")
+        crowd_a.name, crowd_b.name = "people_a", "people_b"
+        cars = [vintage_car(deck, 18, 1.2), vintage_car(deck, -64, -1.2)]
+        for o in flags(deck):
+            show_at(o, 552)
+        for o, dx in ((crowd_a, 9.0), (crowd_b, -8.0), (cars[0], 55.0), (cars[1], -48.0)):
+            show_at(o, 566)
+            key(o, 566, location=(0, 0, 0)); key(o, FRAMES_TOTAL, location=(dx, 0, 0))
+            for fc in o.animation_data.action.fcurves:
+                if fc.data_path == "location":
+                    for kp in fc.keyframe_points:
+                        kp.interpolation = "LINEAR"
+        for o in sampans([(96, -31), (58, -16), (8, 30)]):
+            key(o, 1, location=(0, 0, 0)); key(o, FRAMES_TOTAL, location=(-14, 3, 0))
+    else:
+        people_on_deck(deck, 46, "old")
+        vintage_car(deck, 18, 1.2); vintage_car(deck, -64, -1.2)
+        flags(deck)
+        sampans([(96, -31), (58, -16), (8, 30)])
 
     def place_old():
         r = rng.random()
@@ -1030,11 +1174,16 @@ if A.shot == "open":
             x = rng.choice([-1, 1]) * rng.uniform(W_RIVER + 30, 2600); y = rng.uniform(-2000, 2000)
         if abs(x) < W_RIVER + 20 or (abs(y) < 12 and abs(x) < 200):
             return None
+        if A.shot == "build":   # keep the crane-down camera path from being blocked by canopies
+            ax, ay, bx, by = 215.0, -140.0, 128.0, -100.0
+            t = max(0.0, min(1.0, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)))
+            if math.hypot(x - ax - t * (bx - ax), y - ay - t * (by - ay)) < 22:
+                return None
         return (x, y, h_old(x, y) - 0.2, rng.uniform(1.9, 3.1))
     scatter_trees(protos, 2600, place_old)
     el = world_hdri("kloofendal_48d_partly_cloudy_puresky", 1.0, sun_az=-42)
     sun(-42, 32, 3.4, (1.0, 0.94, 0.86))
-    haze((0.72, 0.76, 0.8), 0.5)
+    haze((0.72, 0.76, 0.8), 0.5, passes=not ANIM)
     cam = ((150, -52, 6.5), (30, 2, 6.5), 28)
 else:
     build_city(); tick('city')
@@ -1075,6 +1224,22 @@ if A.cam:
     v = [float(t) for t in A.cam.split(",")]
     cam = (tuple(v[0:3]), tuple(v[3:6]), v[6] if len(v) > 6 else 30)
 camera(*cam)
+if A.shot == "build":
+    # camera path: wide establishing → along the piers → close on the girders → the opening-day composition
+    c = sc.camera; tgt = bpy.data.objects.new("cam_target", None); COLL.objects.link(tgt)
+    tc = c.constraints.new("TRACK_TO"); tc.target = tgt; tc.track_axis = "TRACK_NEGATIVE_Z"; tc.up_axis = "UP_Y"
+    for f, loc, look in ((1, (240, -150, 30), (40, 0, 3)), (230, (128, -100, 15), (-10, 0, 3.5)),
+                         (400, (70, -34, 11), (-40, 0, 7.5)), (520, (95, -44, 9), (-10, 2, 7.5)),
+                         (FRAMES_TOTAL, (150, -52, 6.5), (30, 2, 6.5))):
+        key(c, f, location=loc); key(tgt, f, location=look)
+    for mp in WATER_MAP:  # drifting ripples
+        mp.inputs["Location"].default_value = (0, 0, 0); mp.inputs["Location"].keyframe_insert("default_value", frame=1)
+        mp.inputs["Location"].default_value = (6.0, 1.5, 0); mp.inputs["Location"].keyframe_insert("default_value", frame=FRAMES_TOTAL)
+    for a in bpy.data.actions:
+        for fc in a.fcurves:
+            if "nodes" in fc.data_path:
+                for kp in fc.keyframe_points:
+                    kp.interpolation = "LINEAR"
 os.makedirs(os.path.dirname(os.path.abspath(A.out)), exist_ok=True)
 sc.render.filepath = os.path.abspath(A.out)
 print("objects:", len(bpy.data.objects), "rendering", A.shot, A.res, A.samples)
@@ -1082,6 +1247,18 @@ for o in bpy.data.objects:
     if o.name.startswith(("kb_", "nb_")):
         o.pass_index = 1
 tick('scene built')
-bpy.ops.render.render(write_still=True)
+if ANIM:
+    f0, f1 = (int(v) for v in A.frames.split(":"))
+    sc.frame_start, sc.frame_end = f0, f1
+    sc.render.fps = FPS
+    sc.render.use_motion_blur = True; sc.render.motion_blur_shutter = 0.5
+    sc.render.use_persistent_data = True
+    sc.render.image_settings.color_mode = "RGB"; sc.render.image_settings.compression = 15
+    os.makedirs(A.outdir, exist_ok=True)
+    sc.render.filepath = os.path.join(os.path.abspath(A.outdir), "f_####")
+    bpy.ops.render.render(animation=True)
+else:
+    sc.frame_set(A.__dict__.get("frame", 1) or 1)
+    bpy.ops.render.render(write_still=True)
 tick('rendered')
 print("saved", A.out)
