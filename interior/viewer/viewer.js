@@ -1,8 +1,14 @@
 // 68-ping apartment viewer: empty shell vs. Japanese wa-style fit-out.
-// Every baked surface is MeshBasicMaterial(albedo map x Cycles lightmap): no real-time lighting, so phones keep 60 fps.
+// Standard quality: every baked surface is MeshBasicMaterial(albedo x Cycles lightmap) -- no real-time lighting, phones keep 60 fps.
+// High quality (?q=hq): denser lightmaps, PBR materials (normal / roughness maps) whose only real-time term is specular
+// reflection from a probe captured where you stand, plus bloom on lamps and MSAA.
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 const S = 0.0218, OX = 80, OY = 675;                 // plan pixels -> metres (same as interior/plan.json)
 const P = (x, y, h) => new THREE.Vector3((x - OX) * S, h, -(OY - y) * S);
@@ -41,8 +47,32 @@ const sunish = new THREE.DirectionalLight(0xfff0dd, 1.2); sunish.position.set(3,
 const loader = new GLTFLoader();
 const texLoader = new THREE.TextureLoader();
 const maxAniso = renderer.capabilities.getMaxAnisotropy();
-const variants = {};         // id -> { root, manifest, ready }
+const variants = {};         // key ("wa", "wa-hq", ...) -> { root, manifest }
 let current = "wa", mode = "walk";
+let quality = (() => {
+  const q = new URLSearchParams(location.search).get("q");
+  if (q === "hq" || q === "std") return q;
+  try { return localStorage.getItem("interior-quality") || "std"; } catch { return "std"; }
+})();
+const vkey = (id, q = quality) => (q === "hq" ? `${id}-hq` : id);
+
+// shader patch for HQ materials: the lightmap (or baked corner colour) is the only diffuse light; the env probe adds
+// specular reflection only, never a second copy of the diffuse light
+const MAPS_NO_IBL_DIFFUSE = THREE.ShaderChunk.lights_fragment_maps
+  .replace("iblIrradiance += getIBLIrradiance( geometryNormal );", "")
+  .replace("#if defined( RE_IndirectDiffuse )", "#if defined( RE_IndirectDiffuse )\n#ifdef USE_VCLIGHT\nirradiance += vColor.rgb * vcIntensity;\n#endif");
+function patchHQ(m, vcIntensity) {
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace("#include <lights_fragment_maps>", MAPS_NO_IBL_DIFFUSE);
+    if (vcIntensity !== undefined) {
+      sh.uniforms.vcIntensity = { value: vcIntensity };
+      sh.fragmentShader = "#define USE_VCLIGHT\nuniform float vcIntensity;\n" +
+        sh.fragmentShader.replace("#include <color_fragment>", "");          // colours are light, not albedo
+    }
+  };
+  m.customProgramCacheKey = () => `hq${vcIntensity !== undefined ? "vc" : ""}`;
+}
+const hqMaterials = new Set();
 
 // ---------------------------------------------------------------- loading
 const fill = document.getElementById("fill"), statusEl = document.getElementById("status");
@@ -60,8 +90,9 @@ function loadGLB(url, onProg) {
   return new Promise((res, rej) => loader.load(url, res, (e) => e.total && onProg && onProg(e.loaded / e.total), rej));
 }
 
-async function loadVariant(id, report) {
-  const base = `assets/${id}/`;
+async function loadVariant(key, report) {
+  const base = `assets/${key}/`;
+  const HQ = key.endsWith("-hq");
   const man = await fetchJSON(base + "manifest.json");
   report(0.05, "讀取材質與光照…");
   const lms = {};
@@ -72,15 +103,18 @@ async function loadVariant(id, report) {
   }
   const texCache = {};
   for (const [name, def] of Object.entries(man.materials)) {
-    if (def.map && !texCache[def.map]) {
-      const t = await loadTex(base + def.map, true, true);
-      if (t) t.flipY = false;
-      texCache[def.map] = t;
+    for (const [k, srgb] of [["map", true], ["normalMap", false], ["roughMap", false]]) {
+      const f = def[k];
+      if (f && !texCache[f] && (k === "map" || HQ)) {
+        const t = await loadTex(base + f, srgb, true);
+        if (t) t.flipY = false;
+        texCache[f] = t;
+      }
     }
   }
   report(0.35, "讀取模型…");
   const gltf = await loadGLB(base + "scene.glb", (f) => report(0.35 + f * 0.45));
-  const root = new THREE.Group(); root.name = id;
+  const root = new THREE.Group(); root.name = key;
   const matCache = {};
   const makeMat = (name, group) => {
     const key = `${name}|${group}`;
@@ -88,10 +122,30 @@ async function loadVariant(id, report) {
     const def = man.materials[name];
     let m;
     if (!def) m = new THREE.MeshBasicMaterial({ color: 0xbbbbbb });
+    else if (def.type === "glass" && HQ) {
+      m = new THREE.MeshStandardMaterial({ color: 0xeef6f6, transparent: true, opacity: 0.08, roughness: 0.02, metalness: 0,
+        depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 1.6 });
+      patchHQ(m); hqMaterials.add(m);
+    }
     else if (def.type === "glass") m = new THREE.MeshBasicMaterial({ color: 0xe6f2f2, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
     else if (def.type === "emit") {
       const c = new THREE.Color().setRGB(...def.color, THREE.LinearSRGBColorSpace).multiplyScalar(Math.min(def.strength / 5, 5));
       m = new THREE.MeshBasicMaterial({ color: c });
+    } else if (HQ) {
+      const Mat = def.coat > 0 ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+      m = new Mat({ roughness: def.roughMap ? def.roughMul ?? 1 : def.rough ?? 0.5, metalness: def.metal ?? 0 });
+      if (def.coat > 0) { m.clearcoat = def.coat; m.clearcoatRoughness = 0.15; }
+      if (def.map && texCache[def.map]) m.map = texCache[def.map];
+      else m.color.setRGB(...def.color, THREE.LinearSRGBColorSpace);
+      if (def.normalMap && texCache[def.normalMap]) { m.normalMap = texCache[def.normalMap]; m.normalScale.setScalar(def.normalScale ?? 0.5); }
+      if (def.roughMap && texCache[def.roughMap]) m.roughnessMap = texCache[def.roughMap];
+      const lm = lms[group];
+      const vl = (man.vertexlit || {})[group];
+      const boost = def.paper ? 1.7 : 1.0;
+      if (vl) { m.vertexColors = true; patchHQ(m, vl.intensity * Math.PI * boost); }
+      else { if (lm && lm.tex) { m.lightMap = lm.tex; m.lightMapIntensity = lm.intensity * boost; } patchHQ(m); }
+      if (def.paper) { m.side = THREE.DoubleSide; m.roughness = 1; }
+      hqMaterials.add(m);
     } else {
       m = new THREE.MeshBasicMaterial();
       if (def.map && texCache[def.map]) m.map = texCache[def.map];
@@ -117,11 +171,11 @@ async function loadVariant(id, report) {
   root.add(gltf.scene);
   report(0.82, "讀取家具與植栽…");
   try {
-    const props = await loadGLB(base + "props.glb", (f) => report(0.82 + f * 0.15));
+    const props = await loadGLB(base + (man.props || "props.glb"), (f) => report(0.82 + f * 0.15));
     props.scene.traverse((o) => {
       if (o.isMesh && o.material) {
         const ms = Array.isArray(o.material) ? o.material : [o.material];
-        ms.forEach((mm) => { if (mm.map) mm.map.anisotropy = 4; mm.envMapIntensity = 0.4; });
+        ms.forEach((mm) => { if (mm.map) mm.map.anisotropy = 4; mm.envMapIntensity = 0.4; if (HQ) hqMaterials.add(mm); });
       }
     });
     root.add(props.scene);
@@ -132,8 +186,8 @@ async function loadVariant(id, report) {
   }
   root.userData.exposure = Math.pow(2, man.exposure || 0);
   report(1, "完成");
-  variants[id] = { root, manifest: man };
-  return variants[id];
+  variants[key] = { root, manifest: man, hq: HQ };
+  return variants[key];
 }
 
 // ---------------------------------------------------------------- views and walking
@@ -143,7 +197,7 @@ function applyLook() {
   camera.rotation.y = look.yaw; camera.rotation.x = look.pitch;
 }
 function floorHeightAt(x, z) {
-  const v = variants[current]; if (!v) return 0;
+  const v = variants[vkey(current)]; if (!v) return 0;
   const rc = new THREE.Raycaster(new THREE.Vector3(x, 2.4, z), new THREE.Vector3(0, -1, 0), 0, 3);
   const hit = rc.intersectObject(v.root, true).find(isFloor);
   return hit ? hit.point.y : 0;
@@ -158,7 +212,7 @@ function goTo(pos, yaw, pitch, dur = 700) {
     camera.position.lerpVectors(from, pos, e);
     if (yaw !== undefined) { look.yaw = fy + dy * e; look.pitch = fp + (pitch - fp) * e; }
     applyLook();
-    if (t >= 1) tween = null;
+    if (t >= 1) { tween = null; probeDirty = true; }
   };
 }
 function jumpView(v, animate = true) {
@@ -207,7 +261,7 @@ canvas.addEventListener("wheel", (e) => {
 
 const ring = document.getElementById("ring");
 function tapWalk(cx, cy) {
-  const v = variants[current]; if (!v) return;
+  const v = variants[vkey(current)]; if (!v) return;
   const ndc = new THREE.Vector2((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1);
   const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, camera);
   const hits = rc.intersectObject(v.root, true);
@@ -241,7 +295,7 @@ function keyMove(dt) {
   if (!f && !s) return;
   const dir = new THREE.Vector3(-Math.sin(look.yaw) * f + Math.cos(look.yaw) * s, 0, -Math.cos(look.yaw) * f - Math.sin(look.yaw) * s).normalize();
   const rc = new THREE.Raycaster(camera.position.clone().setY(camera.position.y - 0.7), dir, 0, 0.45);
-  if (rc.intersectObject(variants[current].root, true).length) return;
+  if (rc.intersectObject(variants[vkey(current)].root, true).length) return;
   camera.position.addScaledVector(dir, dt * 1.6);
   camera.position.y = floorHeightAt(camera.position.x, camera.position.z) + EYE;
 }
@@ -277,30 +331,78 @@ function setMode(m) {
 document.getElementById("mWalk").onclick = () => setMode("walk");
 document.getElementById("mDoll").onclick = () => setMode("doll");
 
-// ---------------------------------------------------------------- variants
+// ---------------------------------------------------------------- variants and quality
 const badge = document.getElementById("badge");
+function flash(t) { badge.textContent = t; badge.style.opacity = 1; setTimeout(() => (badge.style.opacity = 0), 900); }
 function showVariant(id) {
-  const v = variants[id]; if (!v) return;
+  const v = variants[vkey(id)]; if (!v) return;
   current = id;
-  for (const [k, vv] of Object.entries(variants)) vv.root.visible = k === id;
+  for (const [k, vv] of Object.entries(variants)) vv.root.visible = k === vkey(id);
   if (mode === "doll") scene.background = DOLL_BG;
   else if (v.root.userData.sky) { scene.background = v.root.userData.sky; scene.backgroundIntensity = 1.0 / v.root.userData.exposure; }
   renderer.toneMappingExposure = v.root.userData.exposure;
   document.getElementById("vEmpty").setAttribute("aria-pressed", id === "empty");
   document.getElementById("vWa").setAttribute("aria-pressed", id === "wa");
   if (mode === "walk") camera.position.y = floorHeightAt(camera.position.x, camera.position.z) + EYE;
-  badge.textContent = id === "wa" ? "和風" : "空屋"; badge.style.opacity = 1; setTimeout(() => (badge.style.opacity = 0), 900);
+  probeDirty = true;
 }
-async function ensure(id, btn) {
-  if (variants[id]) return showVariant(id);
-  btn.disabled = true; const label = btn.textContent; btn.textContent = "載入…";
-  const v = await loadVariant(id, () => {});
-  scene.add(v.root); v.root.visible = false;
-  btn.disabled = false; btn.textContent = label;
+async function ensure(id, btn, q = quality) {
+  const k = vkey(id, q);
+  if (!variants[k]) {
+    btn.disabled = true; const label = btn.textContent; btn.textContent = "載入…";
+    try {
+      const v = await loadVariant(k, () => {});
+      scene.add(v.root); v.root.visible = false;
+    } finally { btn.disabled = false; btn.textContent = label; }
+  }
+  quality = q; applyQuality();
   showVariant(id);
 }
-document.getElementById("vEmpty").onclick = (e) => ensure("empty", e.currentTarget);
-document.getElementById("vWa").onclick = (e) => ensure("wa", e.currentTarget);
+document.getElementById("vEmpty").onclick = (e) => ensure("empty", e.currentTarget).then(() => flash("空屋"));
+document.getElementById("vWa").onclick = (e) => ensure("wa", e.currentTarget).then(() => flash("和風"));
+document.getElementById("qStd").onclick = (e) => setQuality("std", e.currentTarget);
+document.getElementById("qHq").onclick = (e) => setQuality("hq", e.currentTarget);
+async function setQuality(q, btn) {
+  if (q === quality && variants[vkey(current, q)]) return;
+  try { localStorage.setItem("interior-quality", q); } catch { /* private mode */ }
+  try { await ensure(current, btn, q); flash(q === "hq" ? "高畫質" : "標準"); }
+  catch (e) { console.warn(e); flash("高畫質載入失敗"); }
+}
+
+// HQ rendering: pixel ratio, bloom + MSAA composer, reflection probe
+let composer = null, bloom = null;
+const cubeRT = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType, generateMipmaps: false });
+const cubeCam = new THREE.CubeCamera(0.05, 80, cubeRT);
+const pmrem = new THREE.PMREMGenerator(renderer);
+let envRT = null, probeDirty = false;
+function applyQuality() {
+  const hq = quality === "hq";
+  document.getElementById("qStd").setAttribute("aria-pressed", !hq);
+  document.getElementById("qHq").setAttribute("aria-pressed", hq);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, hq ? 2 : 1.75));
+  if (hq && !composer) {
+    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+    composer = new EffectComposer(renderer, rt);
+    composer.addPass(new RenderPass(scene, camera));
+    bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.32, 0.55, 1.1);
+    composer.addPass(bloom);
+    composer.addPass(new OutputPass());
+  }
+  resize();
+  probeDirty = true;
+}
+function updateProbe() {
+  probeDirty = false;
+  if (quality !== "hq") return;
+  cubeCam.position.copy(mode === "walk" ? camera.position : CENTER.clone().setY(1.4));
+  const bg = scene.background; scene.background = variants[vkey(current)]?.root.userData.sky || bg;
+  const clip = renderer.clippingPlanes; renderer.clippingPlanes = [];
+  cubeCam.update(renderer, scene);
+  renderer.clippingPlanes = clip; scene.background = bg;
+  const old = envRT; envRT = pmrem.fromCubemap(cubeRT.texture);
+  for (const m of hqMaterials) { const first = !m.envMap; m.envMap = envRT.texture; if (first) m.needsUpdate = true; }
+  if (old) old.dispose();
+}
 
 // ---------------------------------------------------------------- ui
 const hintEl = document.getElementById("hint"); let hintTimer = null;
@@ -314,6 +416,7 @@ for (const v of VIEWS) {
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false); camera.aspect = w / h;
+  if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); }
   camera.fov = mode === "walk" ? (w < h ? 78 : 66) : camera.fov; camera.updateProjectionMatrix();
 }
 addEventListener("resize", resize);
@@ -324,8 +427,11 @@ addEventListener("resize", resize);
   const params = new URLSearchParams(location.search);
   const first = params.get("v") === "empty" ? "empty" : "wa";
   try {
-    const v = await loadVariant(first, progress);
+    let v;
+    try { v = await loadVariant(vkey(first), progress); }
+    catch (e) { if (quality !== "hq") throw e; quality = "std"; v = await loadVariant(vkey(first), progress); }
     scene.add(v.root);
+    applyQuality();
     showVariant(first);
     jumpView(VIEWS.find((x) => x.id === (params.get("room") || "living")) || VIEWS[1], false);
     if (params.get("mode") === "doll") setMode("doll");
@@ -333,7 +439,7 @@ addEventListener("resize", resize);
     setHint("拖曳環顧・點地板前往・雙指縮放");
     // preload the other variant quietly so the toggle is instant
     const other = first === "wa" ? "empty" : "wa";
-    loadVariant(other, () => {}).then((o) => { scene.add(o.root); o.root.visible = false; }).catch(() => {});
+    loadVariant(vkey(other), () => {}).then((o) => { scene.add(o.root); o.root.visible = false; }).catch(() => {});
   } catch (e) {
     console.error(e); statusEl.textContent = "載入失敗，請重新整理";
   }
@@ -345,6 +451,7 @@ renderer.setAnimationLoop((now) => {
   if (tween) tween(now);
   keyMove(dt);
   if (mode === "doll") orbit.update();
-  renderer.render(scene, camera);
+  if (probeDirty && !tween) updateProbe();
+  if (quality === "hq" && composer) composer.render(); else renderer.render(scene, camera);
 });
-window.__viewer = { camera, scene, variants, jumpView, setMode, showVariant, VIEWS };
+window.__viewer = { camera, scene, variants, jumpView, setMode, showVariant, VIEWS, setQuality: (q) => setQuality(q, document.getElementById(q === "hq" ? "qHq" : "qStd")), get quality() { return quality; } };

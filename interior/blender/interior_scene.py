@@ -33,6 +33,7 @@ ap.add_argument("--cam", default="", help="x,y,z,tx,ty,tz,lens in plan px (z in 
 ap.add_argument("--bake", default="", help="output dir: bake lightmaps and export GLB instead of rendering")
 ap.add_argument("--texel", type=float, default=48.0, help="lightmap texels per metre")
 ap.add_argument("--night", action="store_true")
+ap.add_argument("--hq", action="store_true", help="bake: high-quality set (denser lightmaps, PBR maps)")
 A = ap.parse_args(argv)
 WA = A.variant == "wa"
 T0 = time.time()
@@ -115,6 +116,9 @@ def pbr(name, tid, size, tint=(1, 1, 1), rough=None, rough_mul=1.0, bump=0.6, sa
         b.inputs["Base Color"].default_value = (*tint, 1)
     m["tint"] = list(tint); m["bright"] = bright
     fr = tex_file(tid, "Rough")
+    m["rough_mul"] = rough_mul; m["coat"] = coat; m["bump"] = bump
+    if fr and rough is None:
+        m["rough_path"] = fr
     if rough is not None:
         b.inputs["Roughness"].default_value = rough
     elif fr:
@@ -122,6 +126,8 @@ def pbr(name, tid, size, tint=(1, 1, 1), rough=None, rough_mul=1.0, bump=0.6, sa
         mm = N("ShaderNodeMath"); mm.operation = "MULTIPLY"; mm.use_clamp = True; mm.inputs[1].default_value = rough_mul
         L(t.outputs["Color"], mm.inputs[0]); L(mm.outputs[0], b.inputs["Roughness"])
     fn = tex_file(tid, "nor_gl")
+    if fn and bump > 0:
+        m["normal_path"] = fn
     if fn and bump > 0:
         t = N("ShaderNodeTexImage"); t.image = img(fn, True)
         nm = N("ShaderNodeNormalMap"); nm.inputs["Strength"].default_value = bump

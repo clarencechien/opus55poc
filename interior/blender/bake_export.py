@@ -50,8 +50,8 @@ def join(objs, name):
     return o
 
 
-def split_small(o, amax, name):
-    """move faces smaller than amax (m2) into a new object (lit by baked corner colours instead of a lightmap)"""
+def split_small(o, amax, name, pred=None):
+    """move faces smaller than amax (m2) -- or matching pred(face) -- into a new object"""
     import bmesh
     bpy.ops.object.select_all(action="DESELECT")
     o.select_set(True); bpy.context.view_layer.objects.active = o
@@ -59,7 +59,7 @@ def split_small(o, amax, name):
     bm = bmesh.from_edit_mesh(o.data)
     n = 0
     for f in bm.faces:
-        f.select = f.calc_area() < amax
+        f.select = pred(f) if pred else f.calc_area() < amax
         n += f.select
     bmesh.update_edit_mesh(o.data)
     if n:
@@ -199,7 +199,23 @@ def prep_texture(mat, dst_dir, size=1024):
     return f"tex/{name}"
 
 
-def sky_jpeg(dst):
+def prep_aux(src, dst_dir, name, size=1024):
+    """normal / roughness map, resized, data kept as-is (non-colour)"""
+    if not src:
+        return None
+    im = bpy.data.images.load(src, check_existing=False)
+    im.colorspace_settings.name = "Non-Color"
+    im.scale(size, size)
+    o = bpy.data.images.new(name, size, size, alpha=False)
+    px = np.empty(size * size * 4, np.float32); im.pixels.foreach_get(px)
+    o.pixels.foreach_set(px)
+    o.filepath_raw = os.path.join(dst_dir, name); o.file_format = "JPEG"
+    bpy.context.scene.render.image_settings.quality = 88
+    o.save()
+    return f"tex/{name}"
+
+
+def sky_jpeg(dst, width=2048):
     """tone-mapped equirect of the HDRI for the viewer's sky sphere"""
     w = bpy.context.scene.world
     env = next((n for n in w.node_tree.nodes if n.type == "TEX_ENVIRONMENT"), None)
@@ -209,7 +225,7 @@ def sky_jpeg(dst):
     im = env.image
     W, H = im.size
     px = np.empty(W * H * 4, np.float32); im.pixels.foreach_get(px); px = px.reshape(H, W, 4)[..., :3]
-    step = max(1, W // 2048)
+    step = max(1, W // width)
     px = px[::step, ::step]
     # bake the world rotation and the Blender->three equirect convention (half turn) into the image
     r = float(rot.inputs["Rotation"].default_value[2]) if rot else 0.0
@@ -225,7 +241,8 @@ def sky_jpeg(dst):
 
 
 def run(A, sc, MATS, tick):
-    out = os.path.join(A.bake, A.variant)
+    HQ = getattr(A, "hq", False)
+    out = os.path.join(A.bake, A.variant + ("-hq" if HQ else ""))
     os.makedirs(os.path.join(out, "tex"), exist_ok=True)
     objs = list(sc.objects)
     realize([o for o in objs if o.type == "MESH"])
@@ -244,6 +261,10 @@ def run(A, sc, MATS, tick):
     emit_o = join(emit_l, "EMIT")
     glass_o = join(glass_l, "GLASS")
     vc_o = split_small(baked["furn"], 0.03, "VC_furn") if "furn" in baked else None
+    if HQ and "arch" in baked:      # two 4096 atlases for the shell: horizontal (floors, ceilings) and vertical faces
+        h = split_small(baked["arch"], 0, "BAKE_arch_h", pred=lambda f: abs(f.normal.z) > 0.7)
+        if h:
+            baked["arch_h"] = h
     tick("joined")
 
     # ---------- lightmap UVs + bake targets
@@ -316,15 +337,20 @@ def run(A, sc, MATS, tick):
         elif "emit" in m:
             e = {"type": "emit", "color": list(m["emit"]), "strength": float(m["strength"])}
         else:
-            tex = prep_texture(m, os.path.join(out, "tex"))
+            tex = prep_texture(m, os.path.join(out, "tex"), 2048 if HQ else 1024)
             e = {"type": "baked", "map": tex, "color": list(m.get("color", [1, 1, 1])) if not tex else [1, 1, 1],
                  "rough": float(m.get("rough", 0.5)), "metal": float(m.get("metal", 0.0))}
+            if HQ:
+                e["normalMap"] = prep_aux(m.get("normal_path"), os.path.join(out, "tex"), f"{name}_n.jpg")
+                e["roughMap"] = prep_aux(m.get("rough_path"), os.path.join(out, "tex"), f"{name}_r.jpg")
+                e["normalScale"] = float(m.get("bump", 0.5)); e["roughMul"] = float(m.get("rough_mul", 1.0))
+                e["coat"] = float(m.get("coat", 0.0))
             if m.get("paper"):
                 e["paper"] = True
         manifest["materials"][name] = e
     tick("materials prepared")
 
-    sky, rot = sky_jpeg(os.path.join(out, "sky.jpg"))
+    sky, rot = sky_jpeg(os.path.join(out, "sky.jpg"), 4096 if HQ else 2048)
     manifest["sky"] = {"file": sky, "rotation": rot}
 
     # ---------- export
@@ -351,8 +377,12 @@ def run(A, sc, MATS, tick):
         outn = next(n for n in nt.nodes if n.type == "OUTPUT_MATERIAL")
         nt.links.new(bs.outputs[0], outn.inputs["Surface"])
     export(os.path.join(out, "scene.glb"), main, "EXPORT")
+    if HQ:                          # props are shared with the standard set
+        manifest["props"] = f"../{A.variant}/props.glb"
+        tick("exported")
+        json.dump(manifest, open(os.path.join(out, "manifest.json"), "w"), ensure_ascii=False, indent=1)
+        return
     props = [o for o in sc.objects if o.name.startswith("P_")]
-    props = props + []
     # phone budget: decimate imported props and shrink their textures
     for o in props:
         if o.type in ("MESH", "CURVE"):
