@@ -40,8 +40,8 @@ function sizeTurn() {
 function drawTurn() {
   const n = meta.n, dpr = tcv.width / innerWidth;
   const f = ((fi % n) + n) % n, i0 = Math.floor(f), i1 = (i0 + 1) % n, raw = f - i0;
-  // 5° between frames: blend through most of the step, holding briefly on each frame so it never looks doubled
-  const u = Math.min(1, Math.max(0, (raw - 0.15) / 0.7)), t = u * u * (3 - 2 * u);
+  // 5° between frames: hold each frame for most of the step and blend only around the switch (no doubled edges)
+  const u = Math.min(1, Math.max(0, (raw - 0.3) / 0.4)), t = u * u * (3 - 2 * u);
   tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   tctx.fillStyle = "#26231f"; tctx.fillRect(0, 0, innerWidth, innerHeight);
   const a = frames[i0], b = frames[i1];
@@ -233,10 +233,13 @@ async function move(to) {
   // 2. walk: the clip starts on exactly this view; translation only, heading locked
   try {
     if (v.readyState < 3) { setHint("讀取影片…"); await waitFor(v, "canplaythrough", 8000); }
-    v.currentTime = 0;
-    await v.play();
-    await new Promise((res) => (v.requestVideoFrameCallback ? v.requestVideoFrameCallback(() => res()) : setTimeout(res, 50)));
+    // show frame 0 (paused) over the identical pano view first, start playing only once it fully covers it,
+    // so a slow first decode can never skip the start of the walk
+    v.pause();
+    if (v.currentTime > 0.001) { v.currentTime = 0; await waitFor(v, "seeked", 3000); }
     playing = v; v.classList.add("on"); setHint(`前往${NODES[to].name}…`); req();
+    await new Promise((res) => setTimeout(res, 200));
+    await v.play();
     const tex = await destTex;
     await waitFor(v, "ended", 15000);
     // 3. arrive: the destination pano at the same heading sits under the clip's last frame, then the clip fades out
