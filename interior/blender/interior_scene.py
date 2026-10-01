@@ -1770,6 +1770,8 @@ def run_tour(jobs):
     pc = bpy.data.objects.new("X_pano", pd); COLL.objects.link(pc); pc.rotation_euler = (math.pi / 2, 0, 0)
     od = bpy.data.cameras.new("turn"); od.type = "ORTHO"; od.ortho_scale = 27.0; od.clip_end = 200
     oc = bpy.data.objects.new("X_turn", od); COLL.objects.link(oc)
+    vd = bpy.data.cameras.new("walkcam"); vd.sensor_fit = "HORIZONTAL"; vd.sensor_width = 36; vd.clip_start = 0.05
+    vc = bpy.data.objects.new("X_walkcam", vd); COLL.objects.link(vc)
     render_settings(A.res, A.samples)
     sc.render.use_persistent_data = True
     sc.cycles.seed = 7; sc.cycles.use_animated_seed = False
@@ -1799,15 +1801,24 @@ def run_tour(jobs):
             shoot(f"pano_{j['name']}.png"); tick(f"pano {j['name']}")
         elif k == "path":
             setup(j, still=False); sc.camera = pc
+            if j.get("hfov"):            # perspective clip with a locked heading (yaw from plan north, clockwise)
+                sc.camera = vc
+                vd.lens = 18.0 / math.tan(math.radians(j["hfov"]) / 2)
+                vc.rotation_euler = (math.pi / 2 + j.get("pitch", 0.0), 0, -j["yaw"])
+            cam = sc.camera
             pts = [Vector((PX(x), PY(y), z)) for x, y, z in j["pts"]]
             seg = [(b - a).length for a, b in zip(pts, pts[1:])]; total = sum(seg)
             for f in range(j["first"], j["last"]):
                 t = f / (j["n"] - 1)
-                d = total * (t * t * t * (t * (6 * t - 15) + 10))          # minimum-jerk ease in / out
+                if j.get("ease") == "smooth":
+                    e = t * t * (3 - 2 * t)                               # gentler peak speed (1.5x the mean)
+                else:
+                    e = t * t * t * (t * (6 * t - 15) + 10)               # minimum-jerk ease in / out
+                d = total * e
                 i = 0
                 while i < len(seg) - 1 and d > seg[i]:
                     d -= seg[i]; i += 1
-                pc.location = pts[i].lerp(pts[i + 1], min(1.0, d / seg[i]))
+                cam.location = pts[i].lerp(pts[i + 1], min(1.0, d / seg[i]))
                 shoot(f"{j['name']}_{f:04d}.jpg")
             tick(f"path {j['name']} {j['first']}-{j['last']}")
         elif k == "turn":

@@ -304,31 +304,43 @@ def walk(variant: str = "wa", job: str = "walk_wa", res: str = "1280x720", sampl
 
 
 # ---------------------------------------------------------------- image-based tour proof of concept
-TOUR_NODES = {"living": [655, 195, 1.5], "washitsu": [512, 262, 1.66]}
-TOUR_PATH = [[655, 195, 1.5], [580, 205, 1.5], [540, 240, 1.52], [520, 258, 1.62], [512, 262, 1.66]]
+TOUR_NODES = {"living": [655, 195, 1.5], "washitsu": [505, 200, 1.66]}
+# straight walk through the open shoji; the step onto the tatami platform happens at the sill (x 533)
+TOUR_WALK = [[655, 195, 1.5], [545, 199, 1.5], [527, 199.6, 1.63], [505, 200, 1.66]]
+
+
+def heading(a, b):
+    """yaw from plan north, clockwise, of the move a -> b (plan px, y down)"""
+    import math
+    return math.atan2(b[0] - a[0], a[1] - b[1])
 
 
 @app.function(image=gpu_image, gpu="L40S", volumes={ASSETS: assets_vol}, timeout=3600, cpu=8.0, memory=32768)
 def tour_job(variant: str, jobs: list) -> dict:
     t0 = time.time()
     fetch_assets(ASSETS); assets_vol.commit()
-    out = pathlib.Path("/tmp/tour"); out.mkdir(exist_ok=True)
+    import shutil
+    out = pathlib.Path("/tmp/tour"); shutil.rmtree(out, ignore_errors=True); out.mkdir()   # containers are reused
     log = run_blender(["--variant", variant, "--shot", "tour", "--assets", ASSETS, "--plan", f"{REMOTE}/plan.json",
                        "--tour", json.dumps(jobs), "--outdir", str(out)])
     return {"files": {f.name: f.read_bytes() for f in out.iterdir() if f.is_file()}, "seconds": round(time.time() - t0, 1), "log": log}
 
 
 @app.local_entrypoint()
-def tour(variant: str = "wa", frames: int = 48, chunks: int = 4, turn: int = 24, probe: bool = False, only: str = ""):
-    """two 360 panoramas, one 360 clip between them, a turntable of the cutaway model"""
+def tour(variant: str = "wa", frames: int = 84, chunks: int = 3, turn: int = 72, tchunks: int = 3, probe: bool = False, only: str = "",
+         panos: str = "living,washitsu"):
+    """360 panoramas at the nodes, perspective walk clips (locked heading) both ways, a turntable of the cutaway model"""
     dst = HERE / "out" / "tour"; dst.mkdir(parents=True, exist_ok=True)
-    pres, cres = ("1024x512", "512x256") if probe else ("4096x2048", "1920x960")
-    batches = [[{"kind": "pano", "name": n, "pos": p, "res": pres, "samples": 32 if probe else 160} for n, p in TOUR_NODES.items()]]
+    pres, cres = ("1024x512", "640x360") if probe else ("4096x2048", "1920x1080")
+    batches = [[{"kind": "pano", "name": n, "pos": TOUR_NODES[n], "res": pres, "samples": 32 if probe else 160} for n in panos.split(",")]]
+    walks = {"living_washitsu": TOUR_WALK, "washitsu_living": TOUR_WALK[::-1]}
     step = -(-frames // chunks)
-    for c in range(0, frames, step):
-        batches.append([{"kind": "path", "name": "clip", "pts": TOUR_PATH, "n": frames, "first": c, "last": min(frames, c + step),
-                         "res": cres, "samples": 16 if probe else 64}])
-    tstep = -(-turn // 2)
+    for name, pts in walks.items():
+        for c in range(0, frames, step):
+            batches.append([{"kind": "path", "name": f"walk_{name}", "pts": pts, "n": frames, "first": c, "last": min(frames, c + step),
+                             "hfov": 100.0, "yaw": heading(pts[0], pts[-1]), "ease": "smooth",
+                             "res": cres, "samples": 16 if probe else 72}])
+    tstep = -(-turn // tchunks)
     for c in range(0, turn, tstep):
         batches.append([{"kind": "turn", "name": "turn", "n": turn, "first": c, "last": min(turn, c + tstep), "nodes": TOUR_NODES,
                          "res": "640x400" if probe else "1440x900", "samples": 16 if probe else 96, "scale": 31.0}])
