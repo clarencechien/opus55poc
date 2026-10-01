@@ -19,7 +19,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 REMOTE = "/root/interior"
 BLENDER_VERSION = "4.2.23"
 BLENDER_URL = f"https://download.blender.org/release/Blender4.2/blender-{BLENDER_VERSION}-linux-x64.tar.xz"
-IGNORE = ["out", "viewer", "ref", "renders", "__pycache__", "*.webp", "*.html"]
+IGNORE = ["out", "viewer", "ref", "renders", "tour", "__pycache__", "*.webp", "*.html"]
 
 cpu_image = (modal.Image.debian_slim(python_version="3.11")
              .apt_install("librsvg2-bin", "fonts-noto-cjk", "ffmpeg")
@@ -301,3 +301,40 @@ def walk(variant: str = "wa", job: str = "walk_wa", res: str = "1280x720", sampl
     r = walk_encode.remote(job, lab)
     (dst / f"{job}.mp4").write_bytes(r["mp4"]); (dst / f"{job}_native.mp4").write_bytes(r["mp4_12"])
     print(f"[encode] {r['frames']} frames {r['size']} -> {dst / (job + '.mp4')}")
+
+
+# ---------------------------------------------------------------- image-based tour proof of concept
+TOUR_NODES = {"living": [655, 195, 1.5], "washitsu": [512, 262, 1.66]}
+TOUR_PATH = [[655, 195, 1.5], [580, 205, 1.5], [540, 240, 1.52], [520, 258, 1.62], [512, 262, 1.66]]
+
+
+@app.function(image=gpu_image, gpu="L40S", volumes={ASSETS: assets_vol}, timeout=3600, cpu=8.0, memory=32768)
+def tour_job(variant: str, jobs: list) -> dict:
+    t0 = time.time()
+    fetch_assets(ASSETS); assets_vol.commit()
+    out = pathlib.Path("/tmp/tour"); out.mkdir(exist_ok=True)
+    log = run_blender(["--variant", variant, "--shot", "tour", "--assets", ASSETS, "--plan", f"{REMOTE}/plan.json",
+                       "--tour", json.dumps(jobs), "--outdir", str(out)])
+    return {"files": {f.name: f.read_bytes() for f in out.iterdir() if f.is_file()}, "seconds": round(time.time() - t0, 1), "log": log}
+
+
+@app.local_entrypoint()
+def tour(variant: str = "wa", frames: int = 48, chunks: int = 4, turn: int = 24, probe: bool = False, only: str = ""):
+    """two 360 panoramas, one 360 clip between them, a turntable of the cutaway model"""
+    dst = HERE / "out" / "tour"; dst.mkdir(parents=True, exist_ok=True)
+    pres, cres = ("1024x512", "512x256") if probe else ("4096x2048", "1920x960")
+    batches = [[{"kind": "pano", "name": n, "pos": p, "res": pres, "samples": 32 if probe else 160} for n, p in TOUR_NODES.items()]]
+    step = -(-frames // chunks)
+    for c in range(0, frames, step):
+        batches.append([{"kind": "path", "name": "clip", "pts": TOUR_PATH, "n": frames, "first": c, "last": min(frames, c + step),
+                         "res": cres, "samples": 16 if probe else 64}])
+    tstep = -(-turn // 2)
+    for c in range(0, turn, tstep):
+        batches.append([{"kind": "turn", "name": "turn", "n": turn, "first": c, "last": min(turn, c + tstep), "nodes": TOUR_NODES,
+                         "res": "640x400" if probe else "1440x900", "samples": 16 if probe else 96, "scale": 31.0}])
+    if only:
+        batches = [b for b in batches if b[0]["kind"] in only.split(",")]
+    for r in tour_job.map([variant] * len(batches), batches):
+        for name, data in r["files"].items():
+            (dst / name).write_bytes(data)
+        print(f"[tour] {len(r['files'])} files in {r['seconds']} s", flush=True)

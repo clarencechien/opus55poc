@@ -35,7 +35,8 @@ ap.add_argument("--texel", type=float, default=48.0, help="lightmap texels per m
 ap.add_argument("--night", action="store_true")
 ap.add_argument("--hq", action="store_true", help="bake: high-quality set (denser lightmaps, PBR maps)")
 ap.add_argument("--walk", default="", help="walkthrough: first:last[:step] frames of the camera path (12 fps)")
-ap.add_argument("--outdir", default="", help="walkthrough: directory for JPEG frames")
+ap.add_argument("--outdir", default="", help="walkthrough / tour: output directory")
+ap.add_argument("--tour", default="", help="JSON list of image-based tour jobs (pano / path / turn), see run_tour()")
 A = ap.parse_args(argv)
 WA = A.variant == "wa"
 T0 = time.time()
@@ -1749,6 +1750,83 @@ def render_settings(res, samples):
     sc.render.image_settings.file_format = "PNG"
 
 
+
+# ============================================================== image-based tour (360 panoramas, 360 path clips, turntable)
+def run_tour(jobs):
+    """jobs: {"kind": "pano", "name", "pos": [px, py, z], "res", "samples"}
+             {"kind": "path", "name", "pts": [[px, py, z], ...], "n": frames, "first", "last", "res", "samples"}
+             {"kind": "turn", "name", "n", "first", "last", "el": deg, "nodes": {id: [px, py, z]}, "res", "samples"}
+    every 360 view is world-aligned (image centre = plan north, +y) so panoramas and clips line up in the viewer"""
+    from bpy_extras.object_utils import world_to_camera_view
+    cut = [o for o in bpy.data.objects
+           if o.name in ("A_slab", "A_ceiling", "A_beams", "E_cove")
+           or (o.name.startswith("E_sub") and o.data and any(m.name.startswith("downlight") for m in o.data.materials))
+           or (o.type == "LIGHT" and o.data.type == "SPOT")]
+    pd = bpy.data.cameras.new("pano"); pd.type = "PANO"; pd.clip_start = 0.05
+    try:
+        pd.panorama_type = "EQUIRECTANGULAR"
+    except AttributeError:
+        pd.cycles.panorama_type = "EQUIRECTANGULAR"
+    pc = bpy.data.objects.new("X_pano", pd); COLL.objects.link(pc); pc.rotation_euler = (math.pi / 2, 0, 0)
+    od = bpy.data.cameras.new("turn"); od.type = "ORTHO"; od.ortho_scale = 27.0; od.clip_end = 200
+    oc = bpy.data.objects.new("X_turn", od); COLL.objects.link(oc)
+    render_settings(A.res, A.samples)
+    sc.render.use_persistent_data = True
+    sc.cycles.seed = 7; sc.cycles.use_animated_seed = False
+    os.makedirs(A.outdir, exist_ok=True)
+
+    def setup(j, still=True):
+        w, h = (int(v) for v in j.get("res", A.res).split("x"))
+        sc.render.resolution_x, sc.render.resolution_y = w, h
+        sc.cycles.samples = j.get("samples", A.samples)
+        sc.cycles.adaptive_threshold = 0.01 if still else 0.03
+        sc.render.image_settings.file_format = "PNG" if still or j["kind"] == "turn" else "JPEG"
+        sc.render.image_settings.quality = 93
+        sc.render.film_transparent = j["kind"] == "turn"          # turntable: composited on a plain backdrop later
+        sc.render.image_settings.color_mode = "RGBA" if j["kind"] == "turn" else "RGB"
+
+    def shoot(path):
+        sc.render.filepath = os.path.join(os.path.abspath(A.outdir), path)
+        bpy.ops.render.render(write_still=True)
+
+    for j in jobs:
+        k = j["kind"]
+        for o in cut:
+            o.hide_render = k == "turn"
+        if k == "pano":
+            setup(j); sc.camera = pc
+            x, y, z = j["pos"]; pc.location = (PX(x), PY(y), z)
+            shoot(f"pano_{j['name']}.png"); tick(f"pano {j['name']}")
+        elif k == "path":
+            setup(j, still=False); sc.camera = pc
+            pts = [Vector((PX(x), PY(y), z)) for x, y, z in j["pts"]]
+            seg = [(b - a).length for a, b in zip(pts, pts[1:])]; total = sum(seg)
+            for f in range(j["first"], j["last"]):
+                t = f / (j["n"] - 1)
+                d = total * (t * t * t * (t * (6 * t - 15) + 10))          # minimum-jerk ease in / out
+                i = 0
+                while i < len(seg) - 1 and d > seg[i]:
+                    d -= seg[i]; i += 1
+                pc.location = pts[i].lerp(pts[i + 1], min(1.0, d / seg[i]))
+                shoot(f"{j['name']}_{f:04d}.jpg")
+            tick(f"path {j['name']} {j['first']}-{j['last']}")
+        elif k == "turn":
+            setup(j, still=False); sc.camera = oc; od.ortho_scale = j.get("scale", 27.0)
+            c = Vector(((PX(80) + PX(1012)) / 2, (PY(66) + PY(675)) / 2, 1.0))
+            el = math.radians(j.get("el", 46.6)); a0 = math.atan2(-1.25, -1.0)
+            proj = {}
+            for f in range(j["first"], j["last"]):
+                a = a0 + 2 * math.pi * f / j["n"]
+                oc.location = c + Vector((math.cos(a) * math.cos(el), math.sin(a) * math.cos(el), math.sin(el))) * 40
+                oc.rotation_euler = (c - oc.location).to_track_quat("-Z", "Y").to_euler()
+                bpy.context.view_layer.update()
+                proj[f] = {nid: [round(v, 4) for v in world_to_camera_view(sc, oc, Vector((PX(x), PY(y), z)))[:2]]
+                           for nid, (x, y, z) in j.get("nodes", {}).items()}
+                shoot(f"{j['name']}_{f:03d}.png")
+            json.dump(proj, open(os.path.join(A.outdir, f"{j['name']}_{j['first']:03d}.json"), "w"))
+            tick(f"turn {j['first']}-{j['last']}")
+
+
 # ============================================================== main
 EXPOSURE = (1.5 if WA else 2.4) if not A.night else 0.4
 sc.view_settings.view_transform = "AgX"; sc.view_settings.exposure = EXPOSURE
@@ -1769,7 +1847,7 @@ if A.bake:
     bk = importlib.util.module_from_spec(spec); spec.loader.exec_module(bk)
     bk.run(A, sc, MATS, tick)
 else:
-    if A.shot == "axo" and not A.walk:
+    if A.shot == "axo" and not A.walk and not A.tour:
         for o in bpy.data.objects:          # cutaway: no slab, no ceilings, no beams
             if o.name in ("A_slab", "A_ceiling", "A_beams", "E_cove") or (o.name.startswith("E_sub") and o.data and
                                                                          any(m.name.startswith("downlight") for m in o.data.materials)):
@@ -1793,6 +1871,9 @@ else:
         sc.render.filepath = os.path.join(os.path.abspath(A.outdir), "f_####")
         bpy.ops.render.render(animation=True)
         tick("walk rendered")
+        sys.exit(0)
+    if A.tour:
+        run_tour(json.loads(A.tour))
         sys.exit(0)
     shots = A.shot.split(",")
     render_settings(A.res, A.samples)
