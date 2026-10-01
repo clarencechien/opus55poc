@@ -173,6 +173,21 @@ def glass(name, tint=(1, 1, 1)):
     return m
 
 
+def glass_thin(name, tint=(0.96, 1.0, 0.98)):
+    """thin glass sheet (shower screens): transparent + fresnel gloss, no refraction, so grazing views never go black"""
+    m = new_mat(name)
+    nt = m.node_tree; N = nt.nodes.new; L = nt.links.new
+    tr = N("ShaderNodeBsdfTransparent"); tr.inputs["Color"].default_value = (*tint, 1)
+    gl = N("ShaderNodeBsdfGlossy"); gl.inputs["Roughness"].default_value = 0.02
+    lw = N("ShaderNodeLayerWeight"); lw.inputs["Blend"].default_value = 0.12
+    mx = N("ShaderNodeMixShader"); L(lw.outputs["Fresnel"], mx.inputs[0]); L(tr.outputs[0], mx.inputs[1]); L(gl.outputs[0], mx.inputs[2])
+    lp = N("ShaderNodeLightPath"); tr2 = N("ShaderNodeBsdfTransparent"); mx2 = N("ShaderNodeMixShader")
+    L(lp.outputs["Is Shadow Ray"], mx2.inputs[0]); L(mx.outputs[0], mx2.inputs[1]); L(tr2.outputs[0], mx2.inputs[2])
+    L(mx2.outputs[0], nt.nodes["Material Output"].inputs["Surface"])
+    m["glass"] = True
+    return m
+
+
 def paper(name, color=(0.93, 0.91, 0.85)):
     """washi for shoji: diffuse + translucent so daylight glows through"""
     m = new_mat(name)
@@ -201,7 +216,7 @@ def make_materials():
     pbr("tile_public", "marble_01", 0.8, tint=(1.0, 0.97, 0.9), rough=0.06, bump=0.05, bright=1.1, sat=0.4, spec=0.6)
     pbr("laminate", "laminate_floor_03", 2.0, tint=(1.0, 0.95, 0.88), bump=0.3, rough_mul=0.9)
     pbr("bath_tile", "marble_01", 0.6, tint=(0.92, 0.92, 0.92), rough=0.1, bump=0.05, sat=0.2, bright=1.1)
-    pbr("balcony", "anti_slip_concrete", 1.5, tint=(0.75, 0.74, 0.72), bump=0.4)
+    pbr("balcony", "concrete_floor_02", 1.2, tint=(0.7, 0.69, 0.67), bump=0.4, sat=0.3)
     if WA:
         pbr("oak_floor", "laminate_floor_02", 2.2, tint=(1.0, 0.94, 0.84), bump=0.35, rough_mul=0.85, bright=1.08, sat=0.75)
         pbr("tatami_a", "tatami_mat", 0.9, tint=(0.62, 0.64, 0.56), bump=0.8, sat=0.55)
@@ -233,6 +248,15 @@ def make_materials():
         flat("water", (0.1, 0.16, 0.15), 0.03, spec=0.5)
         flat("ceramic", (0.75, 0.72, 0.66), 0.25, spec=0.6)
         flat("scroll", (0.86, 0.83, 0.74), 0.8)
+        flat("chrome", (0.86, 0.86, 0.86), 0.1, 1.0)
+        flat("appliance", (0.86, 0.86, 0.84), 0.35, spec=0.5)
+        flat("induction", (0.012, 0.012, 0.014), 0.04, spec=0.8)
+        flat("graphite", (0.09, 0.09, 0.095), 0.35)
+        glass_thin("glass_thin")
+        pbr("towel", "rough_linen", 0.12, tint=(0.97, 0.95, 0.9), bump=1.3, sat=0.15, bright=1.1)
+        pbr("towel_indigo", "rough_linen", 0.12, tint=(0.28, 0.36, 0.5), bump=1.3, sat=0.4)
+        pbr("rug", "rough_linen", 0.18, tint=(0.7, 0.64, 0.54), bump=1.2, sat=0.35)
+        pbr("deck", "oak_veneer_01", 1.0, tint=(0.66, 0.54, 0.44), bump=0.5, sat=0.6, rough_mul=1.2)
         emit("led_warm", (1.0, 0.8, 0.58), 30.0)
         emit("lamp_paper", (1.0, 0.86, 0.68), 6.0)
         emit("downlight", (1.0, 0.9, 0.78), 25.0)
@@ -336,6 +360,31 @@ class MB:
             for i in range(seg):
                 self.face([pts[j][i], pts[j + 1][i], pts[j + 1][(i + 1) % seg], pts[j][(i + 1) % seg]], m)
 
+    def lathe(self, cx, cy, z, prof, seg=32, m=0):
+        """surface of revolution about a vertical axis; prof = [(r, dz), ...] (outer surface upward, inner surface downward)"""
+        rings = [[(cx + max(r, 1e-3) * math.cos(2 * math.pi * i / seg), cy + max(r, 1e-3) * math.sin(2 * math.pi * i / seg), z + h)
+                  for i in range(seg)] for r, h in prof]
+        for j in range(len(prof) - 1):
+            a, b = rings[j], rings[j + 1]
+            for i in range(seg):
+                i2 = (i + 1) % seg
+                self.face([a[i], a[i2], b[i2], b[i]], m)
+
+    def well(self, x0, y0, x1, y1, z0, z1, m=0):
+        """open-top basin seen from inside (floor + four walls facing inward)"""
+        self.face([(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0)], m)
+        self.face([(x0, y0, z0), (x0, y0, z1), (x1, y0, z1), (x1, y0, z0)], m)
+        self.face([(x1, y1, z0), (x1, y1, z1), (x0, y1, z1), (x0, y1, z0)], m)
+        self.face([(x0, y1, z0), (x0, y1, z1), (x0, y0, z1), (x0, y0, z0)], m)
+        self.face([(x1, y0, z0), (x1, y0, z1), (x1, y1, z1), (x1, y1, z0)], m)
+
+    def path(self, pts, r, seg=10, m=0):
+        """round tube through a 3D polyline (faucets, rails)"""
+        for a, b in zip(pts, pts[1:]):
+            self.cylt(a, b, r, r, seg, m)
+        for p in pts[1:-1]:
+            self.sphere(p, r, seg, 6, m)
+
     def build(self, name, mats, bevel=0.0, smooth=False):
         me = bpy.data.meshes.new(name)
         me.from_pydata(self.v, [], self.f)
@@ -384,7 +433,7 @@ def room(rid):
 def floor_mat(rm):
     f = rm["floor"]
     if rm.get("outdoor"):
-        return "balcony"
+        return "cement_tile" if WA else "balcony"     # wa: balconies get a cedar deck on top
     if WA:
         return {"stone": "marble"}.get(f, "oak_floor")
     return {"public": "tile_public", "tile": "tile_public", "wood": "laminate", "stone": "bath_tile"}.get(f, "tile_public")
@@ -506,13 +555,14 @@ def build_openings():
             else:
                 h = (mid, y1 if op.get("hinge") == "start" else y0)   # plan start = top = larger y
                 u = Vector((0, -1 if op.get("hinge") == "start" else 1, 0))
-                nrm = Vector((op.get("side", 1), 0, 0))
+                nrm = Vector((1 if (WA and op["id"] == "D_SVC") else op.get("side", 1), 0, 0))   # wa: opens into the kitchen
             a = math.radians(84)
             d = u * math.cos(a) + nrm * math.sin(a)
             w = L - 0.06
             p0 = Vector((h[0], h[1], 0)) + u * 0.03 + nrm * 0.03
-            dr.obox((p0.x, p0.y), (p0.x + d.x * w, p0.y + d.y * w), 0.04, 0.0, dh - 0.01, 0)
-            dr.obox((p0.x + d.x * (w - 0.08), p0.y + d.y * (w - 0.08)), (p0.x + d.x * (w - 0.06), p0.y + d.y * (w - 0.06)), 0.1, 1.0, 1.03, 2)
+            if not (WA and op["id"] == "D_K"):                  # kitchen gets a sliding door in the wa fit-out
+                dr.obox((p0.x, p0.y), (p0.x + d.x * w, p0.y + d.y * w), 0.04, 0.0, dh - 0.01, 0)
+                dr.obox((p0.x + d.x * (w - 0.08), p0.y + d.y * (w - 0.08)), (p0.x + d.x * (w - 0.06), p0.y + d.y * (w - 0.06)), 0.1, 1.0, 1.03, 2)
             # frame casing around the opening, flush with both wall faces
             wt = abs((y1 - y0) if horiz else (x1 - x0))
             seg(0, 0.04, 0, dh, wt + 0.02, 1, dr); seg(L - 0.04, L, 0, dh, wt + 0.02, 1, dr)
@@ -524,12 +574,35 @@ def build_openings():
 
 
 # ============================================================== imported CC0 props (Poly Haven .blend, LOD appended)
+def load_gltf(aid):
+    """fallback for Poly Haven .blend files saved by a newer Blender than the render image's"""
+    f = glob.glob(os.path.join(A.assets, "models", aid, f"{aid}_1k.gltf"))
+    if not f:
+        print("[model] missing", aid); return None
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=f[0])
+    new = [o for o in bpy.data.objects if o not in before]
+    objs = [o for o in new if o.type == "MESH"]
+    for o in objs:
+        mw = o.matrix_world.copy(); o.parent = None; o.matrix_world = mw
+    for o in new:
+        for c in list(o.users_collection):
+            c.objects.unlink(o)
+        if o.type != "MESH":
+            bpy.data.objects.remove(o)
+    return objs or None
+
+
 def load_model(aid):
     f = glob.glob(os.path.join(A.assets, "models", aid, f"{aid}_1k.blend"))
     if not f:
-        print("[model] missing", aid); return None
-    with bpy.data.libraries.load(f[0], link=False) as (src, dst):
-        dst.objects = list(src.objects)
+        return load_gltf(aid)
+    try:
+        with bpy.data.libraries.load(f[0], link=False) as (src, dst):
+            dst.objects = list(src.objects)
+    except OSError as e:
+        print("[model] blend unreadable, using glTF:", aid, e)
+        return load_gltf(aid)
     objs = [o for o in dst.objects if o is not None and o.type == "MESH"]
     for im in bpy.data.images:
         if im.filepath.startswith("//"):
@@ -558,6 +631,10 @@ def place_model(aid, x, y, z=0.0, rot=0.0, scale=1.0, name=None, height=None):
         zmin = min((o.matrix_world @ Vector(c)).z for o in objs for c in o.bound_box)
         scale = height / max(zmax - zmin, 1e-3)
     root.location = (x, y, z); root.rotation_euler = (0, 0, rot); root.scale = (scale,) * 3
+    bpy.context.view_layer.update()
+    pts = [o.matrix_world @ Vector(c) for o in objs for c in o.bound_box]
+    print(f"[prop] {name or aid}: " + " ".join(f"{max(p[k] for p in pts) - min(p[k] for p in pts):.2f}" for k in range(3))
+          + f" z0={min(p.z for p in pts):.2f}")
     return root
 
 
@@ -635,13 +712,14 @@ def light(kind, loc, energy, color=(1.0, 0.8, 0.6), size=0.05, spot=None, rot=(0
     LIGHTS.append((kind, loc, energy, color, size, spot, rot, name))
 
 
-def downlight_grid(mb, x, y, n=2, pitch=0.18, energy=35):
+def downlight_grid(mb, x, y, n=2, pitch=0.18, energy=35, z=None):
     """the square 4-light recessed fixtures of the reference (with real spots below)"""
+    z = z or CH
     for i in range(n):
         for j in range(n):
             cx, cy = x + (i - (n - 1) / 2) * pitch, y + (j - (n - 1) / 2) * pitch
-            mb.box(cx - 0.055, cy - 0.055, CH - 0.004, cx + 0.055, cy + 0.055, CH, 0)
-            light("SPOT", (cx, cy, CH - 0.02), energy, (1.0, 0.88, 0.74), size=0.04, spot=(math.radians(75), 0.6))
+            mb.box(cx - 0.055, cy - 0.055, z - 0.004, cx + 0.055, cy + 0.055, z, 0)
+            light("SPOT", (cx, cy, z - 0.02), energy, (1.0, 0.88, 0.74), size=0.04, spot=(math.radians(75), 0.6))
 
 
 def sofa(mb, T, w=2.3, d=0.95):
@@ -807,10 +885,11 @@ def wardrobe(mb, p0, p1, depth, z0, z1, m=0, groove=2, pitch=0.6):
         mb.obox((a[0] - u.x * 0.004, a[1] - u.y * 0.004), (a[0] + u.x * 0.004, a[1] + u.y * 0.004), 0.006, z0 + 0.01, z1 - 0.01, groove)
 
 
-def clad_room(mb, rect_px, z0, z1, m, t=0.012):
-    """line all four inner faces of a rectangular room, leaving doors/windows open (windows keep the part below the sill)"""
+def clad_room(mb, rect_px, z0, z1, m, t=0.012, only="nsew"):
+    """line the inner faces of a rectangular room, leaving doors/windows open (windows keep the part below the sill)"""
     rx0, ry0, rx1, ry1 = rect_px
     sides = {"w": ("x", rx0, ry0, ry1), "e": ("x", rx1, ry0, ry1), "n": ("y", ry0, rx0, rx1), "s": ("y", ry1, rx0, rx1)}
+    sides = {k: v for k, v in sides.items() if k in only}
     face_of = {"w": "e", "e": "w", "n": "s", "s": "n"}       # panel faces into the room
     for side, (ax, c, a, b) in sides.items():
         cuts = []
@@ -851,14 +930,140 @@ def clad(mb, x0, y0, x1, y1, z0, z1, face, t=0.015, m=0):
         mb.box(x0, y1 - t, z0, x1, y1, z1, m)
 
 
+
+# ---------------------------------------------------------------- fixtures (bath, kitchen, bedroom)
+def toilet(T):
+    """one-piece toilet with washlet and low tank (TOTO type). local: tank against the wall at y=-0.34, front = +y"""
+    m = MB(T)
+    m.sq(0, 0.03, 0.17, 0.15, 0.21, 0.17, e1=0.4, e2=0.75, m=0)          # trapway body
+    m.sq(0, 0.07, 0.33, 0.19, 0.27, 0.075, e1=0.45, e2=0.85, m=0)        # bowl
+    m.sq(0, 0.06, 0.42, 0.185, 0.255, 0.022, e1=0.3, e2=0.85, m=0)       # seat + closed lid
+    m.sq(0, -0.19, 0.45, 0.17, 0.09, 0.045, e1=0.3, e2=0.3, m=0)         # washlet unit
+    m.sq(0, -0.255, 0.66, 0.205, 0.085, 0.2, e1=0.2, e2=0.22, m=0)       # tank
+    return m
+
+
+def vessel(mb, x, y, z, r=0.2, h=0.14, oval=1.0):
+    """round vessel basin sitting on a counter (outer wall, rolled rim, inner bowl)"""
+    prof = [(0.0, 0.0), (0.3, 0.0), (0.36, 0.03), (0.75, 0.3), (0.95, 0.72), (1.0, 1.0), (0.94, 1.03), (0.86, 0.66),
+            (0.6, 0.3), (0.25, 0.17), (0.0, 0.16)]
+    mb.lathe(x, y, z, [(r * a, h * b) for a, b in prof], seg=40, m=0)
+
+
+def wall_spout(mb, x, y, z, dx, dy, L=0.17, m=0):
+    """wall-mounted basin spout + lever, projecting along (dx, dy)"""
+    mb.cylt((x, y, z), (x + dx * 0.012, y + dy * 0.012, z), 0.032, 0.032, 20, m)
+    mb.cylt((x, y, z), (x + dx * L, y + dy * L, z), 0.011, 0.01, 12, m)
+    mb.cylt((x + dx * 0.012, y + dy * 0.012, z + 0.09), (x + dx * 0.06, y + dy * 0.06, z + 0.09), 0.008, 0.008, 10, m)
+    mb.cylt((x, y, z + 0.09), (x + dx * 0.012, y + dy * 0.012, z + 0.09), 0.022, 0.022, 16, m)
+
+
+def gooseneck(mb, x, y, z, dx, dy, h=0.36, reach=0.22, m=0):
+    """kitchen gooseneck faucet on the counter, spout pointing along (dx, dy)"""
+    pts = [(x, y, z), (x, y, z + h)]
+    for k in range(1, 7):
+        a = math.pi * k / 6
+        rr = reach / 2
+        pts.append((x + dx * rr * (1 - math.cos(a)), y + dy * rr * (1 - math.cos(a)), z + h + rr * math.sin(a) * 0.8))
+    pts.append((x + dx * reach, y + dy * reach, z + h - 0.08))
+    mb.cyl(x, y, z, z + 0.04, 0.03, 16, m)
+    mb.path(pts, 0.012, 10, m)
+    mb.cylt((x - dy * 0.03, y + dx * 0.03, z + 0.12), (x - dy * 0.1, y + dx * 0.1, z + 0.14), 0.007, 0.006, 8, m)
+
+
+def towel_bar(x, y, z, L, dx, dy, mats=("chrome", "towel"), folds=1):
+    """bar parallel to a wall at (x, y) running along (dx, dy); towel(s) draped over it. returns (metal MB, towel MB)"""
+    nx, ny = dy, -dx                                  # wall normal (into the room)
+    bar, tw = MB(), MB()
+    a = (x - dx * L / 2 + nx * 0.07, y - dy * L / 2 + ny * 0.07, z); b = (x + dx * L / 2 + nx * 0.07, y + dy * L / 2 + ny * 0.07, z)
+    bar.cylt(a, b, 0.009, 0.009, 10, 0)
+    for p in ((x - dx * L / 2, y - dy * L / 2), (x + dx * L / 2, y + dy * L / 2)):
+        bar.cylt((p[0], p[1], z), (p[0] + nx * 0.075, p[1] + ny * 0.075, z), 0.008, 0.008, 8, 0)
+        bar.cylt((p[0], p[1], z), (p[0] + nx * 0.01, p[1] + ny * 0.01, z), 0.022, 0.022, 14, 0)
+    for k in range(folds):
+        w = L * 0.78 / folds
+        cx, cy = x + dx * (k - (folds - 1) / 2) * (L / folds) + nx * 0.07, y + dy * (k - (folds - 1) / 2) * (L / folds) + ny * 0.07
+        T = Matrix.Translation((cx, cy, z - 0.24)) @ Matrix.Rotation(math.atan2(dy, dx), 4, "Z")
+        t = MB(T); t.sq(0, 0, 0, w / 2, 0.024, 0.26, e1=0.18, e2=0.25, nu=20, nv=10, m=0)
+        base = len(tw.v); tw.v += t.v; tw.f += [[i + base for i in f_] for f_ in t.f]; tw.m += t.m; tw.rot += t.rot
+    return bar, tw
+
+
+def towel_stack(x, y, z, w=0.32, d=0.24, n=3, rot=0.0):
+    t = MB(Matrix.Translation((x, y, z)) @ Matrix.Rotation(rot, 4, "Z"))
+    for k in range(n):
+        t.sq(0, 0, 0.03 + k * 0.055, w / 2, d / 2, 0.028, e1=0.35, e2=0.25, nu=20, nv=8, m=0)
+    return t
+
+
+def rain_shower(mb, x, y, zc, wall=None, m=0):
+    """ceiling-mounted rain head; optional wall mixer + hand shower on a slide rail at wall=(wx, wy, nx, ny)"""
+    mb.cylt((x, y, zc), (x, y, zc - 0.25), 0.012, 0.012, 10, m)
+    mb.cyl(x, y, zc - 0.27, zc - 0.25, 0.15, 32, m)
+    if wall:
+        wx, wy, nx, ny = wall
+        mb.cylt((wx, wy, 1.05), (wx + nx * 0.06, wy + ny * 0.06, 1.05), 0.035, 0.03, 16, m)       # mixer
+        mb.cylt((wx + nx * 0.06, wy + ny * 0.06, 1.05), (wx + nx * 0.07, wy + ny * 0.07, 1.05), 0.03, 0.03, 16, m)
+        mb.cylt((wx + nx * 0.03, wy + ny * 0.03, 1.15), (wx + nx * 0.03, wy + ny * 0.03, 1.95), 0.011, 0.011, 10, m)  # rail
+        mb.cylt((wx + nx * 0.06, wy + ny * 0.06, 1.62), (wx + nx * 0.07, wy + ny * 0.07, 1.82), 0.015, 0.03, 12, m)   # hand shower
+        mb.cyl(wx + nx * 0.07, wy + ny * 0.07, 1.82, 1.84, 0.045, 20, m)
+
+
+def nightstand(fx, I, x, y, w=0.46, d=0.4, h=0.46, rot=0.0):
+    """floating-look ash night table with one drawer (groove + finger pull); front = local +y"""
+    T = Matrix.Translation((x, y, 0)) @ Matrix.Rotation(rot, 4, "Z")
+    m = MB(T)
+    m.box(-w / 2, -d / 2, 0.06, w / 2, d / 2, h, 0)
+    m.box(-w / 2 + 0.04, -d / 2 + 0.04, 0.0, w / 2 - 0.04, d / 2 - 0.04, 0.06, 1)
+    m.box(-w / 2 + 0.01, d / 2, h - 0.15, w / 2 - 0.01, d / 2 + 0.002, h - 0.144, 1)
+    m.box(-0.06, d / 2, h - 0.06, 0.06, d / 2 + 0.003, h - 0.05, 1)
+    return m
+
+
+def table_lamp(x, y, z, h=0.44, r=0.15):
+    """ceramic base + linen drum shade (emissive) with a real bulb"""
+    b = MB(); b.lathe(x, y, z, [(0.0, 0.0), (0.06, 0.0), (0.085, 0.05), (0.09, 0.12), (0.06, 0.2), (0.02, 0.24), (0.0, 0.245)], seg=24)
+    b.cylt((x, y, z + 0.24), (x, y, z + h - 0.06), 0.006, 0.006, 8, 0)
+    s = MB(); s.cyl(x, y, z + h - 0.2, z + h, r, 32, 0, caps=False)
+    light("POINT", (x, y, z + h - 0.11), 14, (1.0, 0.76, 0.5), size=0.04)
+    return b, s
+
+
+def pane(mb, p0, p1, z0, z1, m=0):
+    """single-sheet vertical glass (no thickness)"""
+    mb.face([(p0[0], p0[1], z0), (p1[0], p1[1], z0), (p1[0], p1[1], z1), (p0[0], p0[1], z1)], m)
+
+
+def rug(x0, y0, x1, y1, z=0.0):
+    m = MB(); m.sq((x0 + x1) / 2, (y0 + y1) / 2, z + 0.006, abs(x1 - x0) / 2, abs(y1 - y0) / 2, 0.006, e1=0.5, e2=0.06, nu=48, nv=4)
+    return m
+
+
+def washer(fx, I, x, y, z, front, stacked=True):
+    """drum washer (+ dryer on top) against a wall; front = axis-aligned unit vector the doors face"""
+    fxv, fyv = front
+    w, d, h = 0.6, 0.62, 0.85
+    hx, hy = (w / 2, d / 2) if fyv else (d / 2, w / 2)
+    px, py = abs(fyv), abs(fxv)                           # along the front face
+    for k in range(2 if stacked else 1):
+        z0 = z + k * (h + 0.02)
+        fx.box(x - hx, y - hy, z0, x + hx, y + hy, z0 + h, I["appliance"])
+        cx, cy = x + fxv * hx, y + fyv * hy               # centre of the front face
+        fx.cylt((cx, cy, z0 + 0.42), (cx + fxv * 0.02, cy + fyv * 0.02, z0 + 0.42), 0.2, 0.19, 32, I["chrome"])
+        fx.cylt((cx + fxv * 0.02, cy + fyv * 0.02, z0 + 0.42), (cx + fxv * 0.026, cy + fyv * 0.026, z0 + 0.42), 0.15, 0.15, 32, I["induction"])
+        fx.box(min(cx, cx + fxv * 0.004) - 0.25 * px, min(cy, cy + fyv * 0.004) - 0.25 * py, z0 + h - 0.12,
+               max(cx, cx + fxv * 0.004) + 0.25 * px, max(cy, cy + fyv * 0.004) + 0.25 * py, z0 + h - 0.04, I["graphite"])
+
+
 # ============================================================== wa fit-out
 def build_wa():
     fx = MB()      # fitted millwork & furniture (materials by index below)
     FX = ["ash", "cedar", "walnut", "black", "fabric_grey", "linen", "cement_tile", "washi", "fusuma", "tatami_a", "tatami_b",
           "tatami_g", "cushion", "indigo", "bedding", "dark_wood", "marble", "porcelain", "stone", "hinoki", "bamboo", "ceramic",
-          "scroll", "mirror", "steel", "plaster", "water"]
+          "scroll", "mirror", "steel", "plaster", "water", "chrome", "appliance", "induction", "graphite", "deck"]
     I = {k: i for i, k in enumerate(FX)}
-    glm = MB()      # glass in shoji (雪見) and partitions
+    glm = MB()      # glass in shoji (雪見)
+    gsh = MB()      # thin shower screens
     lamp = MB()     # emissive paper / LEDs
     LM = ["lamp_paper", "led_warm", "downlight"]
     J = {k: i for i, k in enumerate(LM)}
@@ -1050,21 +1255,79 @@ def build_wa():
     dl = MB(); downlight_grid(dl, *P(692, 560), 2, 0.16, 20); sub.append((dl, ["downlight"]))
     place_model("potted_plant_01", *P(720, 640), 0.006, height=0.9, name="plant_genkan")
 
-    # ---------- kitchen: ash cabinets, stone top, tall units
+    # ---------- kitchen: ash run with stone top, undermount sink + gooseneck, induction under a slim hood,
+    #            panel fridge column, back counter with open shelves, sliding door, under-cabinet light
     kx0, ky0, kx1, ky1 = R([415, 525, 625, 633])
-    fx.box(kx0, ky0, 0.1, kx1, ky0 + 0.6, 0.86, I["ash"]); fx.box(kx0, ky0, 0.0, kx1, ky0 + 0.55, 0.1, I["black"])
-    fx.box(kx0, ky0, 0.86, kx1, ky0 + 0.62, 0.9, I["stone"])
-    fx.box(kx0, ky0, 1.45, kx1 - 0.7, ky0 + 0.35, 2.3, I["ash"])
-    fx.box(kx1 - 0.65, ky0, 0.0, kx1, ky0 + 0.65, 2.3, I["ash"])
-    fx.box(kx0 + 0.9, ky0 + 0.2, 0.9, kx0 + 1.5, ky0 + 0.5, 0.905, I["steel"])
+    fr0 = kx1 - 0.65                                                              # fridge column
+    ks0, ks1, ksy0, ksy1 = kx0 + 0.95, kx0 + 1.65, ky0 + 0.1, ky0 + 0.52          # sink cut-out
+    ck0 = kx0 + 2.55                                                              # induction hob
+    fx.box(kx0, ky0, 0.1, fr0, ky0 + 0.6, 0.86, I["ash"]); fx.box(kx0, ky0, 0.0, fr0, ky0 + 0.55, 0.1, I["black"])
+    for a, b, c, d in ((kx0, ky0, ks0, ky0 + 0.62), (ks1, ky0, fr0, ky0 + 0.62), (ks0, ky0, ks1, ksy0), (ks0, ksy1, ks1, ky0 + 0.62)):
+        fx.box(a, b, 0.86, c, d, 0.9, I["stone"])
+    fx.well(ks0, ksy0, ks1, ksy1, 0.68, 0.9, I["chrome"])
+    fx.cyl(ks0 + 0.35, (ksy0 + ksy1) / 2, 0.68, 0.682, 0.045, 16, I["graphite"])
+    gooseneck(fx, (ks0 + ks1) / 2, ky0 + 0.05, 0.9, 0, 1, m=I["chrome"])
+    fx.box(ck0, ky0 + 0.07, 0.9, ck0 + 0.76, ky0 + 0.56, 0.906, I["induction"])
+    for dx_, dy_, r_ in ((0.2, 0.18, 0.1), (0.56, 0.18, 0.1), (0.2, 0.42, 0.08), (0.56, 0.42, 0.08)):
+        fx.cyl(ck0 + dx_, ky0 + 0.07 + dy_, 0.906, 0.907, r_, 32, I["graphite"], caps=True)
+    n = max(1, round((fr0 - kx0) / 0.6))
+    for i in range(1, n):                                                         # door joints
+        x = kx0 + (fr0 - kx0) * i / n
+        fx.box(x - 0.003, ky0 + 0.6, 0.12, x + 0.003, ky0 + 0.603, 0.78, I["dark_wood"])
+    fx.box(kx0, ky0 + 0.6, 0.79, fr0, ky0 + 0.606, 0.81, I["dark_wood"])          # pull channel
+    for z in (0.32, 0.55):                                                        # drawers under the hob
+        fx.box(ck0, ky0 + 0.6, z - 0.003, ck0 + 0.76, ky0 + 0.603, z + 0.003, I["dark_wood"])
+    fx.box(kx0, ky0, 0.9, fr0, ky0 + 0.012, 1.5, I["marble"])                     # splashback
+    fx.box(kx0, ky0, 1.5, fr0 - 0.02, ky0 + 0.35, 2.3, I["ash"])                  # wall units
+    for i in range(1, n):
+        x = kx0 + (fr0 - kx0) * i / n
+        fx.box(x - 0.003, ky0 + 0.35, 1.52, x + 0.003, ky0 + 0.353, 2.28, I["dark_wood"])
+    fx.box(ck0 - 0.02, ky0 + 0.012, 1.44, ck0 + 0.78, ky0 + 0.48, 1.5, I["steel"])  # slim hood
+    for a, b in ((kx0 + 0.05, ck0 - 0.06), (ck0 + 0.82, fr0 - 0.08)):              # under-cabinet LED
+        lamp.box(a, ky0 + 0.29, 1.495, b, ky0 + 0.32, 1.5, J["led_warm"])
+        light("AREA", ((a + b) / 2, ky0 + 0.3, 1.48), 30 * (b - a), (1.0, 0.84, 0.66), size=(b - a, 0.05))
+    fx.box(fr0, ky0, 0.0, kx1, ky0 + 0.65, 2.3, I["ash"])                         # fridge column (panel-ready)
+    fx.box(fr0 + 0.01, ky0 + 0.65, 0.78, kx1 - 0.01, ky0 + 0.653, 0.786, I["dark_wood"])
+    fx.box(fr0 + 0.01, ky0 + 0.65, 1.94, kx1 - 0.01, ky0 + 0.653, 1.946, I["dark_wood"])
+    for z0_, z1_ in ((0.95, 1.75), (0.3, 0.68)):
+        hx_ = fr0 + 0.07
+        fx.cylt((hx_, ky0 + 0.69, z0_), (hx_, ky0 + 0.69, z1_), 0.011, 0.011, 10, I["steel"])
+        for zz in (z0_ + 0.03, z1_ - 0.03):
+            fx.cylt((hx_, ky0 + 0.65, zz), (hx_, ky0 + 0.69, zz), 0.007, 0.007, 8, I["steel"])
+    bc0, bc1 = PX(420), PX(505)                                                   # back counter (north wall, west of the door)
+    fx.box(bc0, ky1 - 0.45, 0.1, bc1, ky1, 0.86, I["ash"]); fx.box(bc0, ky1 - 0.4, 0.0, bc1, ky1, 0.1, I["black"])
+    fx.box(bc0, ky1 - 0.47, 0.86, bc1, ky1, 0.9, I["stone"])
+    for k in range(1, 3):
+        x = bc0 + (bc1 - bc0) * k / 3
+        fx.box(x - 0.003, ky1 - 0.453, 0.12, x + 0.003, ky1 - 0.45, 0.78, I["dark_wood"])
+    fx.box(bc0, ky1 - 0.456, 0.79, bc1, ky1 - 0.45, 0.81, I["dark_wood"])
+    for z in (1.42, 1.78):                                                        # open shelves
+        fx.box(bc0, ky1 - 0.28, z, bc1, ky1, z + 0.03, I["ash"])
+    lamp.box(bc0 + 0.05, ky1 - 0.26, 1.415, bc1 - 0.05, ky1 - 0.23, 1.42, J["led_warm"])
+    light("AREA", ((bc0 + bc1) / 2, ky1 - 0.25, 1.40), 40, (1.0, 0.84, 0.66), size=(bc1 - bc0 - 0.1, 0.05))
+    # sliding door (open, parked on the kitchen side of the wall)
+    dk0 = PX(560)
+    fx.box(dk0, ky1 - 0.065, 0.005, dk0 + 1.17, ky1 - 0.03, 2.13, I["ash"])
+    fx.box(dk0 + 0.04, ky1 - 0.068, 0.95, dk0 + 0.06, ky1 - 0.064, 1.25, I["dark_wood"])
+    fx.box(PX(508), ky1 - 0.075, 2.13, dk0 + 1.2, ky1 - 0.02, 2.16, I["dark_wood"])
+    for p_ in ((470, 580), (565, 580)):
+        dl = MB(); downlight_grid(dl, *P(*p_), 2, 0.16, 22); sub.append((dl, ["downlight"]))
+    place_model("vintage_electric_kettle", bc0 + 0.35, ky1 - 0.24, 0.9, 2.6, name="kettle")
+    place_model("wooden_cutting_board", ks1 + 0.42, ky0 + 0.3, 0.9, 0.15, name="board")
+    place_model("pot_enamel_01", ck0 + 0.2, ky0 + 0.25, 0.907, 0.4, name="pot")
+    place_model("wooden_bowl_01", bc0 + 0.35, ky1 - 0.14, 1.45, name="bowl")
+    place_model("ceramic_vase_01", bc1 - 0.3, ky1 - 0.14, 1.81, height=0.24, name="vase_kit")
+    place_model("wicker_basket_01", bc1 - 0.35, ky1 - 0.14, 1.45, name="basket_kit")
 
     # ---------- master bedroom
     mx0, my0, mx1, my1 = R([788, 133, 1004, 591])
     bx_, by_ = PX(788), PY(255)
     _f, _s = bed(Matrix.Translation((bx_ + 0.14, by_, 0)), w=1.9, l=2.15, head_h=1.05, head_w=3.4); sub.append((_f, ["ash", "black", "cedar"])); sub.append((_s, ["linen", "bedding"], True))
+    sub.append((rug(bx_ + 1.2, by_ - 1.45, bx_ + 3.5, by_ + 1.45), ["rug"], True))
     for sy in (-1, 1):
-        fm, pm = andon(bx_ + 0.3, by_ + sy * 1.35, 0.0, h=0.5, w=0.22)
-        sub.append((fm, ["ash"])); sub.append((pm, ["lamp_paper"]))
+        sub.append((nightstand(fx, I, bx_ + 0.4, by_ + sy * 1.33, w=0.5, rot=-math.pi / 2), ["ash", "dark_wood"]))
+        b_, s_ = table_lamp(bx_ + 0.4, by_ + sy * 1.33, 0.46)
+        sub.append((b_, ["ceramic"], True)); sub.append((s_, ["lamp_paper"]))
     ms0, _, ms1, _ = R([805, 125, 951, 133])
     msy = PY(133)
     Lm = ms1 - ms0
@@ -1081,59 +1344,189 @@ def build_wa():
     fx.cyl((mx0 + mx1) / 2, PY(150) - 0.55, 0.0, 0.42, 0.24, 24, I["walnut"])
     dl = MB(); downlight_grid(dl, (mx0 + mx1) / 2 + 0.6, by_, 2, 0.16, 20); sub.append((dl, ["downlight"]))
 
-    # ---------- master bath: marble, hinoki tub, cedar vanity with layered wood cove, glass shower
+    # ---------- master bath: marble, hinoki tub, twin vessel basins on a cedar vanity under a layered wood cove,
+    #            glass wet area (rain + hand shower, hinoki stool and bucket), washlet toilet, towels
+    ZB = CH - 0.05                                                                # bath ceilings
     bx0, by0, bx1, by1 = R([756, 440, 896, 591])
-    clad_room(fx, [756, 440, 896, 591], 0.0, CH - 0.05, I["marble"])
+    clad_room(fx, [756, 440, 896, 591], 0.0, ZB, I["marble"])
     tx0_, ty0_, tx1_, ty1_ = R([820, 548, 894, 589])
     fx.box(tx0_, ty0_, 0.0, tx1_, ty1_, 0.62, I["hinoki"], skip=("top",))
     fx.box(tx0_ + 0.05, ty0_ + 0.05, 0.08, tx1_ - 0.05, ty1_ - 0.05, 0.62, I["hinoki"], skip=("top",))
     fx.box(tx0_, ty0_, 0.6, tx1_, ty0_ + 0.05, 0.62, I["hinoki"]); fx.box(tx0_, ty1_ - 0.05, 0.6, tx1_, ty1_, 0.62, I["hinoki"])
     fx.box(tx0_, ty0_, 0.6, tx0_ + 0.05, ty1_, 0.62, I["hinoki"]); fx.box(tx1_ - 0.05, ty0_, 0.6, tx1_, ty1_, 0.62, I["hinoki"])
     fx.box(tx0_ + 0.05, ty0_ + 0.05, 0.47, tx1_ - 0.05, ty1_ - 0.05, 0.48, I["water"])
+    wall_spout(fx, PX(896) - 0.012, (ty0_ + ty1_) / 2, 0.75, -1, 0, L=0.16, m=I["chrome"])           # tub filler
     vx0, vy0, vx1, vy1 = R([822, 440, 895, 466])
     fx.box(vx0, vy0, 0.42, vx1, vy1 - 0.01, 0.82, I["cedar"])
+    fx.box(vx0 + 0.01, vy0 - 0.003, 0.618, vx1 - 0.01, vy0, 0.624, I["dark_wood"])              # drawer joints
+    fx.box((vx0 + vx1) / 2 - 0.003, vy0 - 0.003, 0.44, (vx0 + vx1) / 2 + 0.003, vy0, 0.8, I["dark_wood"])
     fx.box(vx0, vy0 - 0.02, 0.82, vx1, vy1 - 0.01, 0.86, I["stone"])
-    fx.cyl((vx0 + vx1) / 2, (vy0 + vy1) / 2, 0.86, 1.0, 0.2, 32, I["porcelain"])
-    fx.box(vx0 + 0.1, vy1 - 0.03, 1.1, vx1 - 0.1, vy1 - 0.012, 1.95, I["mirror"])
+    bas = MB()
+    for bxc in (vx0 + 0.42, vx1 - 0.42):
+        vessel(bas, bxc, vy1 - 0.3, 0.86, r=0.2, h=0.14)
+        wall_spout(fx, bxc, vy1 - 0.012, 1.08, 0, -1, L=0.2, m=I["chrome"])
+    sub.append((bas, ["porcelain"], True))
+    sub.append((towel_stack((vx0 + vx1) / 2, vy1 - 0.25, 0.86, w=0.26, d=0.2, n=3), ["towel"], True))
+    fx.box(vx0 + 0.1, vy1 - 0.03, 1.2, vx1 - 0.1, vy1 - 0.012, 1.95, I["mirror"])
     for k in range(3):
         fx.box(vx0 + 0.05 * k, vy1 - 0.1 - 0.06 * k, 2.0 + 0.08 * k, vx1 - 0.05 * k, vy1 - 0.012, 2.04 + 0.08 * k, I["cedar"])
     lamp.box(vx0 + 0.1, vy1 - 0.12, 1.99, vx1 - 0.1, vy1 - 0.1, 2.0, J["led_warm"])
-    tcx, tcy = P(778, 460)
-    fx.box(tcx - 0.19, tcy - 0.02, 0.0, tcx + 0.19, tcy + 0.35, 0.4, I["porcelain"]); fx.box(tcx - 0.19, tcy + 0.25, 0.4, tcx + 0.19, tcy + 0.42, 0.8, I["porcelain"])
+    sub.append((toilet(Matrix.Translation((PX(778), PY(440) - 0.352, 0)) @ Matrix.Rotation(math.pi, 4, "Z")), ["porcelain"], True))
+    fx.cylt((bx0 + 0.012, PY(470), 0.72), (bx0 + 0.1, PY(470), 0.72), 0.008, 0.008, 8, I["chrome"])       # paper holder
+    fx.cylt((bx0 + 0.1, PY(470) + 0.08, 0.72), (bx0 + 0.1, PY(470) - 0.08, 0.72), 0.008, 0.008, 8, I["chrome"])
+    br_, tw_ = towel_bar(PX(805), PY(440) - 0.012, 1.05, 0.5, 1, 0); sub.append((br_, ["chrome"])); sub.append((tw_, ["towel"], True))
     shx = PX(820)
-    glm.box(shx - 0.005, PY(591), 0.0, shx + 0.005, PY(525), 2.1, 0)
+    pane(gsh, (shx, PY(591) + 0.012), (shx, PY(525)), 0.02, 2.1)                                # wet-area screens
+    pane(gsh, (bx0 + 0.012, PY(525)), (PX(800), PY(525)), 0.02, 2.1)
+    fx.box(shx - 0.012, PY(591), 2.1, shx + 0.012, PY(525), 2.13, I["chrome"])
+    fx.box(bx0, PY(525) - 0.012, 2.1, PX(800), PY(525) + 0.012, 2.13, I["chrome"])
     fx.box(bx0 + 0.02, PY(591) + 0.1, 0.0, shx - 0.02, PY(525) - 0.02, 0.02, I["stone"])
-    light("AREA", ((bx0 + bx1) / 2, (by0 + by1) / 2, CH - 0.08), 40, (1.0, 0.85, 0.7), size=0.5, name="bath_fill")
+    fx.box(bx0 + 0.05, PY(591) + 0.14, 0.02, shx - 0.06, PY(591) + 0.19, 0.022, I["chrome"])     # linear drain
+    rain_shower(fx, PX(790), PY(560), ZB, wall=(bx0 + 0.012, PY(560), 1, 0), m=I["chrome"])
+    place_model("wooden_stool_01", PX(795), PY(566), 0.02, 0.3, name="bath_stool")
+    place_model("wooden_bucket_01", PX(772), PY(580), 0.02, 1.0, name="bath_bucket")
+    light("AREA", ((bx0 + bx1) / 2, (by0 + by1) / 2, ZB - 0.03), 40, (1.0, 0.85, 0.7), size=0.5, name="bath_fill")
+    for p_ in ((778, 492), (858, 520), (857, 568)):
+        dl = MB(); downlight_grid(dl, *P(*p_), 1, 0.16, 18, z=ZB); sub.append((dl, ["downlight"]))
 
-    # ---------- bedrooms 2, 4, 5 (simpler): platform beds, shoji on windows, wardrobes, cove
-    _f, _s = bed(Matrix.Translation((PX(355) - 0.15, PY(230), 0)) @ Matrix.Rotation(math.pi, 4, "Z"), w=1.6, l=2.05, head_h=0.9); sub.append((_f, ["ash", "black", "cedar"])); sub.append((_s, ["linen", "bedding"], True))
+    # ---------- bedrooms 2, 4, 5: platform beds with night tables and lamps, rugs, shoji on windows, wardrobes, cove
+    b2x, b2y = PX(206) + 0.14, PY(230)
+    _f, _s = bed(Matrix.Translation((b2x, b2y, 0)), w=1.6, l=2.05, head_h=0.9); sub.append((_f, ["ash", "black", "cedar"])); sub.append((_s, ["linen", "bedding"], True))
+    sub.append((rug(b2x + 0.9, b2y - 1.2, b2x + 3.0, b2y + 1.2), ["rug"], True))
+    for sy in (-1, 1):
+        sub.append((nightstand(fx, I, b2x + 0.24, b2y + sy * 1.13, w=0.42, rot=-math.pi / 2), ["ash", "dark_wood"]))
+        b_, s_ = table_lamp(b2x + 0.24, b2y + sy * 1.13, 0.46, h=0.4, r=0.13)
+        sub.append((b_, ["ceramic"], True)); sub.append((s_, ["lamp_paper"]))
     wardrobe(fx, P(383, 316), P(383, 133), 0.6, 0.0, CH, I["ash"], I["dark_wood"])
     ax0, ay0, ax1, ay1 = R([219, 66, 334, 74])
     for i in range(3):
         a, b = ax0 + (ax1 - ax0) * i / 3, ax0 + (ax1 - ax0) * (i + 1) / 3
         shoji(fx, (a, ay0 - 0.06 - 0.03 * (i % 2)), (b, ay0 - 0.06 - 0.03 * (i % 2)), HT["window_sill"], HT["window_head"], I["ash"], I["washi"], grid=(2, 5))
-    _f, _s = bed(Matrix.Translation((PX(220), PY(518) + 0.14, 0)) @ Matrix.Rotation(math.pi / 2, 4, "Z"), w=1.6, l=2.0, head_h=0.9); sub.append((_f, ["ash", "black", "cedar"])); sub.append((_s, ["linen", "bedding"], True))
+    dl = MB(); downlight_grid(dl, b2x + 1.6, b2y, 2, 0.16, 18); sub.append((dl, ["downlight"]))
+    b4x, b4y = PX(220), PY(518) + 0.14
+    _f, _s = bed(Matrix.Translation((b4x, b4y, 0)) @ Matrix.Rotation(math.pi / 2, 4, "Z"), w=1.6, l=2.0, head_h=0.9); sub.append((_f, ["ash", "black", "cedar"])); sub.append((_s, ["linen", "bedding"], True))
+    sub.append((rug(b4x - 1.25, b4y + 1.0, b4x + 1.25, b4y + 2.75), ["rug"], True))
+    for sx in (-1, 1):
+        sub.append((nightstand(fx, I, b4x + sx * 1.13, b4y + 0.24, w=0.42), ["ash", "dark_wood"]))
+        b_, s_ = table_lamp(b4x + sx * 1.13, b4y + 0.24, 0.46, h=0.4, r=0.13)
+        sub.append((b_, ["ceramic"], True)); sub.append((s_, ["lamp_paper"]))
+    wd, fb = lounge_chair(Matrix.Translation(P(145, 405) + (0,)) @ Matrix.Rotation(-0.75 * math.pi, 4, "Z"))
+    sub.append((wd, ["ash"])); sub.append((fb, ["chair_fabric"], True))
     wardrobe(fx, P(331, 518), P(331, 380), 0.55, 0.0, CH, I["ash"], I["dark_wood"])
     cx0_, cy0_, cx1_, cy1_ = R([98, 420, 111, 498])
     for i in range(2):
         a, b = cy0_ + (cy1_ - cy0_) * i / 2, cy0_ + (cy1_ - cy0_) * (i + 1) / 2
         shoji(fx, (cx1_ + 0.06 + 0.03 * i, a), (cx1_ + 0.06 + 0.03 * i, b), HT["window_sill"], HT["window_head"], I["ash"], I["washi"], grid=(2, 5))
-    _f, _s = bed(Matrix.Translation((PX(365), PY(518) + 0.14, 0)) @ Matrix.Rotation(math.pi / 2, 4, "Z"), w=1.0, l=2.0, head_h=0.85, head_w=1.3); sub.append((_f, ["ash", "black", "cedar"])); sub.append((_s, ["linen", "bedding"], True))
+    dl = MB(); downlight_grid(dl, b4x, b4y + 1.9, 2, 0.16, 18); sub.append((dl, ["downlight"]))
+    b5x, b5y = PX(365), PY(518) + 0.14
+    _f, _s = bed(Matrix.Translation((b5x, b5y, 0)) @ Matrix.Rotation(math.pi / 2, 4, "Z"), w=1.0, l=2.0, head_h=0.85, head_w=1.3); sub.append((_f, ["ash", "black", "cedar"])); sub.append((_s, ["linen", "bedding"], True))
+    sub.append((nightstand(fx, I, b5x + 0.82, b5y + 0.24, w=0.38), ["ash", "dark_wood"]))
     wardrobe(fx, P(393, 378), P(337, 378), 0.55, 0.0, CH, I["ash"], I["dark_wood"])
-    fx.box(PX(410), PY(505), 0.72, PX(440), PY(420), 0.75, I["ash"])                       # desk
-    fx.box(PX(410), PY(505), 0.0, PX(412), PY(420), 0.72, I["ash"])
-    # baths 2/3: marble cladding, vanity, toilet
-    for rid in ("BA2", "BA3"):
-        rm = room(rid)
-        xs = [x for x, _ in rm["poly"]]; ys = [y for _, y in rm["poly"]]
-        a0, b0, a1, b1 = R([min(xs), min(ys), max(xs), max(ys)])
-        clad_room(fx, [min(xs), max(min(ys), 133 if rid == "BA2" else 0), max(xs), max(ys)], 0.0, 1.2, I["marble"])
-        fx.box(a0 + 0.01, b0 + 0.3, 0.45, a0 + 0.55, b0 + 1.2, 0.85, I["cedar"])
-        fx.cyl(a0 + 0.3, b0 + 0.75, 0.85, 0.97, 0.18, 24, I["porcelain"])
+    dx0, dy0, dx1, dy1 = R([410, 420, 441, 485])                                  # study desk with side panels, shelves, lamp, chair
+    fx.box(dx0, dy0, 0.72, dx1, dy1, 0.75, I["ash"])
+    fx.box(dx0, dy0, 0.0, dx1, dy0 + 0.03, 0.72, I["ash"]); fx.box(dx0, dy1 - 0.03, 0.0, dx1, dy1, 0.72, I["ash"])
+    fx.box(dx0 + 0.05, dy0 + 0.03, 0.6, dx1, dy1 - 0.03, 0.62, I["ash"])
+    for z in (1.25, 1.62):
+        fx.box(dx1 - 0.26, dy0, z, dx1, dy1, z + 0.025, I["ash"])
+    b_, s_ = table_lamp(dx1 - 0.2, dy0 + 0.22, 0.75, h=0.36, r=0.1)
+    sub.append((b_, ["ceramic"], True)); sub.append((s_, ["lamp_paper"]))
+    wd, fb = dining_chair(Matrix.Translation((dx0 - 0.12, (dy0 + dy1) / 2, 0)) @ Matrix.Rotation(-math.pi / 2, 4, "Z"))
+    sub.append((wd, ["walnut"])); sub.append((fb, ["chair_fabric"], True))
+    bk = MB(); x_ = dy0 + 0.1                                                         # a row of books on the upper shelf
+    for k, (hh, tt, mi) in enumerate(((0.24, 0.03, 0), (0.22, 0.025, 1), (0.26, 0.035, 2), (0.21, 0.02, 3), (0.23, 0.04, 4), (0.25, 0.03, 1),
+                                       (0.2, 0.028, 0), (0.24, 0.022, 2), (0.22, 0.032, 4), (0.19, 0.05, 3))):
+        bk.box(dx1 - 0.22, x_, 1.645, dx1 - 0.03, x_ + tt, 1.645 + hh, mi); x_ += tt + 0.002
+    for k in range(3):
+        bk.box(dx1 - 0.21, dy0 + 0.5 + k * 0.035, 1.275, dx1 - 0.04, dy0 + 0.53 + k * 0.035 - 0.004, 1.275 + 0.22 - 0.02 * k, k)
+    sub.append((bk, ["indigo", "linen", "olive", "dark_wood", "scroll"]))
+    dl = MB(); downlight_grid(dl, *P(410, 440), 1, 0.16, 20); sub.append((dl, ["downlight"]))
+
+    # ---------- baths 2/3: wainscot marble, full-height marble glass shower with rain head, vessel basin on a floating
+    #            cedar vanity, wall spout, mirror under a cedar shelf with LED, washlet toilet, towel bar, downlights
+    clad_room(fx, [111, 133, 200, 214], 0.0, 1.2, I["marble"], only="sew")
+    clad(fx, *R([111, 133, 142, 133]), 0.0, 1.2, "s", 0.012, I["marble"])
+    clad_room(fx, [142, 74, 200, 133], 0.0, ZB, I["marble"], only="new")
+    clad_room(fx, [111, 295, 200, 371], 0.0, 1.2, I["marble"], only="sew")
+    clad_room(fx, [111, 240, 200, 295], 0.0, ZB, I["marble"], only="new")
+    for (sh, gl_, rain, mixer, van, wc, bar, dls) in (
+        ([142, 74, 200, 133], (PX(142), PY(133), PX(178)), P(171, 103), (PX(171), PY(74) - 0.012, 0, -1),
+         (138, 182), (Matrix.Translation((PX(150), PY(214) + 0.352, 0)), None), (PX(200) - 0.012, PY(196), 0, -1), ((158, 172),)),
+        ([111, 240, 200, 295], (PX(111), PY(295), PX(163)), P(150, 267), (PX(150), PY(240) - 0.012, 0, -1),
+         (328, 368), (Matrix.Translation((PX(111) + 0.352, PY(312), 0)) @ Matrix.Rotation(-math.pi / 2, 4, "Z"), None),
+         (PX(168), PY(371) + 0.012, -1, 0), ((160, 336),)),
+    ):
+        sx0_, sy0_, sx1_, sy1_ = R(sh)
+        fx.box(sx0_ + 0.012, sy0_, 0.0, sx1_ - 0.012, sy1_ - 0.012, 0.02, I["stone"])
+        gx0__, gy__, gx1__ = gl_
+        pane(gsh, (gx0__ + 0.012, gy__), (gx1__, gy__), 0.02, 2.05)
+        fx.box(gx1__ - 0.012, gy__ - 0.012, 0.02, gx1__, gy__ + 0.012, 2.05, I["chrome"])
+        rain_shower(fx, rain[0], rain[1], ZB, wall=mixer, m=I["chrome"])
+        wx = PX(111) + 0.012
+        vy0__, vy1__ = PY(van[1]), PY(van[0])
+        vcy = (vy0__ + vy1__) / 2
+        fx.box(wx, vy0__, 0.45, wx + 0.5, vy1__, 0.82, I["cedar"])
+        fx.box(wx + 0.5, vy0__ + 0.01, 0.635, wx + 0.503, vy1__ - 0.01, 0.641, I["dark_wood"])
+        fx.box(wx, vy0__ - 0.01, 0.82, wx + 0.52, vy1__ + 0.01, 0.85, I["stone"])
+        vb = MB(); vessel(vb, wx + 0.28, vcy, 0.85, r=0.18, h=0.13); sub.append((vb, ["porcelain"], True))
+        wall_spout(fx, wx, vcy, 1.07, 1, 0, L=0.19, m=I["chrome"])
+        fx.box(wx, vy0__ + 0.06, 1.22, wx + 0.018, vy1__ - 0.06, 1.88, I["mirror"])
+        fx.box(wx, vy0__, 1.95, wx + 0.14, vy1__, 1.98, I["cedar"])
+        lamp.box(wx + 0.1, vy0__ + 0.03, 1.945, wx + 0.12, vy1__ - 0.03, 1.95, J["led_warm"])
+        light("AREA", (wx + 0.11, vcy, 1.93), 18, (1.0, 0.85, 0.68), size=(0.05, vy1__ - vy0__ - 0.1))
+        sub.append((toilet(wc[0]), ["porcelain"], True))
+        br_, tw_ = towel_bar(bar[0], bar[1], 1.0, 0.45, bar[2], bar[3]); sub.append((br_, ["chrome"])); sub.append((tw_, ["towel"], True))
+        for p_ in dls:
+            dl = MB(); downlight_grid(dl, *P(*p_), 1, 0.16, 18, z=ZB); sub.append((dl, ["downlight"]))
+        dl = MB(); downlight_grid(dl, *rain, 1, 0.16, 12, z=ZB); sub.append((dl, ["downlight"]))
+
+    # ---------- balconies: cedar decking, outdoor table set, plants
+    def deck(rect, w=0.14, gap=0.008, seg=2.4):
+        x0, y0, x1, y1 = R(rect)
+        y, k = y0 + 0.004, 0
+        while y + w <= y1 + 1e-3:
+            off = (k % 3) * seg / 3 + 0.3
+            cuts = sorted({x0, x1} | {x0 + off + seg * i for i in range(8) if x0 + 0.2 < x0 + off + seg * i < x1 - 0.2})
+            for a, b in zip(cuts, cuts[1:]):
+                fx.box(a + 0.002, y, -0.06, b - 0.002, y + w, -0.03, I["deck"])
+            y += w + gap; k += 1
+    deck([525, 72, 717, 125]); deck([788, 72, 969, 125])
+    place_model("outdoor_table_chair_set_01", *P(672, 98), -0.03, 0.0, name="patio_set")
+    place_model("potted_plant_02", *P(952, 88), -0.03, height=1.1, name="plant_bmb")
+    place_model("potted_plant_04", *P(800, 86), -0.03, 1.4, height=1.3, name="plant_bmb2")
+
+    # ---------- service balcony (glass parapet on the south): stacked washer/dryer, utility sink and tall cabinet on the
+    #            north wall, drying poles with laundry, basket
+    zf = -0.06
+    washer(fx, I, PX(381), PY(612) + 0.31, zf, (0, 1))
+    wy = PY(525)
+    us0, us1 = PX(302), PX(330)
+    fx.box(us0, wy - 0.55, zf, us1, wy, 0.8, I["appliance"])
+    for a, b, c, d in ((us0, wy - 0.12, us1, wy), (us0, wy - 0.56, us1, wy - 0.5), (us0, wy - 0.56, us0 + 0.05, wy), (us1 - 0.05, wy - 0.56, us1, wy)):
+        fx.box(a, b, 0.8, c, d, 0.84, I["steel"])
+    fx.well(us0 + 0.05, wy - 0.5, us1 - 0.05, wy - 0.12, 0.55, 0.84, I["steel"])
+    gooseneck(fx, (us0 + us1) / 2, wy - 0.06, 0.84, 0, -1, h=0.3, reach=0.2, m=I["chrome"])
+    fx.box(us0 + 0.01, wy - 0.553, 0.4, us1 - 0.01, wy - 0.55, 0.406, I["graphite"])
+    fx.box(PX(268), wy - 0.45, zf, PX(299), wy, 2.2, I["appliance"])
+    fx.box((PX(268) + PX(299)) / 2 - 0.002, wy - 0.453, zf + 0.05, (PX(268) + PX(299)) / 2 + 0.002, wy - 0.45, 2.15, I["graphite"])
+    for py_ in (566, 584):
+        yy = PY(py_); top = H - 0.45 if 574 <= py_ <= 591 else H
+        fx.cylt((PX(125), yy, 2.1), (PX(250), yy, 2.1), 0.014, 0.014, 10, I["chrome"])
+        for px_ in (130, 245):
+            fx.cylt((PX(px_), yy, 2.1), (PX(px_), yy, top), 0.01, 0.01, 8, I["chrome"])
+    laundry = {"towel": MB(), "towel_indigo": MB(), "linen": MB()}
+    for px_, py_, mt, ww in ((148, 566, "towel", 0.5), (176, 566, "towel_indigo", 0.45), (206, 566, "linen", 0.6),
+                             (160, 584, "linen", 0.55), (194, 584, "towel", 0.5), (228, 584, "towel_indigo", 0.4)):
+        laundry[mt].sq(PX(px_), PY(py_), 2.1 - 0.32, ww / 2, 0.02, 0.33, e1=0.15, e2=0.25, nu=20, nv=10)
+    for mt, m_ in laundry.items():
+        sub.append((m_, [mt], True))
+    place_model("wicker_basket_01", *P(345, 562), zf, 0.3, name="basket_svc")
+    for p_ in ((200, 560), (360, 555)):
+        dl = MB(); downlight_grid(dl, *P(*p_), 1, 0.16, 18, z=H); sub.append((dl, ["downlight"]))
 
     # ---------- build all
     fx.build("F_fitout", FX, bevel=0.003)
     glm.build("G_shoji_glass", ["glass"])
+    gsh.build("G_shower_glass", ["glass_thin"])
     lamp.build("E_lamps", LM)
     groups = {}
     for entry in sub:
@@ -1245,6 +1638,18 @@ SHOTS = {
     "master":   ((965, 385, 1.5), (800, 215, 0.85), 16),
     "bath":     ((772, 505, 1.55), (880, 520, 0.95), 15),
     "garden":   ((468, 178, 1.22), (468, 60, 0.95), 20),
+    # audit views of every remaining room
+    "kitchen":  ((616, 545, 1.55), (430, 612, 0.95), 15),
+    "br2":      ((350, 150, 1.5), (215, 250, 0.7), 16),
+    "br4":      ((289, 394, 1.5), (150, 492, 0.8), 15),
+    "br5":      ((432, 392, 1.5), (350, 500, 0.8), 15),
+    "ba2":      ((222, 156, 1.55), (111, 168, 0.95), 14),
+    "ba3":      ((188, 252, 1.55), (120, 352, 0.9), 14),
+    "hall":     ((525, 346, 1.5), (215, 346, 1.2), 18),
+    "balcony":  ((535, 112, 1.5), (717, 95, 0.6), 16),
+    "svc":      ((402, 540, 1.6), (120, 585, 0.85), 15),
+    "bath2":    ((842, 490, 1.55), (765, 585, 0.8), 14),
+    "master2":  ((800, 405, 1.5), (985, 200, 1.0), 16),
 }
 
 
@@ -1389,10 +1794,16 @@ else:
         bpy.ops.render.render(animation=True)
         tick("walk rendered")
         sys.exit(0)
-    camera(A.shot)
+    shots = A.shot.split(",")
     render_settings(A.res, A.samples)
     os.makedirs(os.path.dirname(os.path.abspath(A.out)), exist_ok=True)
-    sc.render.filepath = os.path.abspath(A.out)
-    print("objects:", len(bpy.data.objects), "rendering", A.variant, A.shot, A.res, A.samples)
-    bpy.ops.render.render(write_still=True)
-    tick("rendered")
+    sc.render.use_persistent_data = len(shots) > 1
+    for shot in shots:                      # several shots from one scene build (audits)
+        if sc.camera:
+            bpy.data.objects.remove(sc.camera, do_unlink=True)
+        camera(shot)
+        out = A.out if len(shots) == 1 else A.out.replace(".png", f"_{shot}.png")
+        sc.render.filepath = os.path.abspath(out)
+        print("objects:", len(bpy.data.objects), "rendering", A.variant, shot, A.res, A.samples)
+        bpy.ops.render.render(write_still=True)
+        tick(f"rendered {shot}")

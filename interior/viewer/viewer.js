@@ -14,7 +14,7 @@ const S = 0.0218, OX = 80, OY = 675;                 // plan pixels -> metres (s
 const P = (x, y, h) => new THREE.Vector3((x - OX) * S, h, -(OY - y) * S);
 const EYE = 1.52;
 const FLOORS = new Set(["oak_floor", "laminate", "tile_public", "marble", "stone", "bath_tile", "balcony", "gravel", "soil",
-  "tatami_g", "tatami_a", "tatami_b"]);
+  "tatami_g", "tatami_a", "tatami_b", "deck", "cement_tile", "rug"]);
 const isFloor = (h) => {
   const m = Array.isArray(h.object.material) ? h.object.material[h.face?.materialIndex ?? 0] : h.object.material;
   const n = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : null;
@@ -29,8 +29,10 @@ const VIEWS = [
   { id: "dining", name: "餐廳", pos: [650, 345], look: [470, 480], lookH: 0.9 },
   { id: "master", name: "主臥", pos: [965, 385], look: [800, 215], lookH: 0.9 },
   { id: "bath", name: "主浴", pos: [772, 505], look: [880, 520], lookH: 1.0 },
-  { id: "br2", name: "臥室二", pos: [236, 300], look: [300, 110], lookH: 1.0 },
-  { id: "br4", name: "臥室四", pos: [300, 392], look: [160, 470], lookH: 1.0 },
+  { id: "kitchen", name: "廚房", pos: [616, 545], look: [430, 612], lookH: 0.95 },
+  { id: "br2", name: "臥室二", pos: [350, 150], look: [215, 250], lookH: 0.7 },
+  { id: "br4", name: "臥室四", pos: [289, 394], look: [150, 492], lookH: 0.8 },
+  { id: "balcony", name: "陽台", pos: [535, 112], look: [717, 95], lookH: 0.6 },
 ];
 
 const canvas = document.getElementById("c");
@@ -92,6 +94,18 @@ function loadGLB(url, onProg) {
   return new Promise((res, rej) => loader.load(url, res, (e) => e.total && onProg && onProg(e.loaded / e.total), rej));
 }
 
+let _metalEnv = null;
+function metalEnv() {        // warm ceiling-to-floor gradient used as a cheap reflection for metals in standard mode
+  if (_metalEnv) return _metalEnv;
+  const c = document.createElement("canvas"); c.width = 64; c.height = 32;
+  const g = c.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 32);
+  gr.addColorStop(0, "#f4eee4"); gr.addColorStop(0.45, "#cfc5b8"); gr.addColorStop(0.55, "#8d8379"); gr.addColorStop(1, "#5a524a");
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 32);
+  _metalEnv = new THREE.CanvasTexture(c);
+  _metalEnv.mapping = THREE.EquirectangularReflectionMapping; _metalEnv.colorSpace = THREE.SRGBColorSpace;
+  return _metalEnv;
+}
+
 async function loadVariant(key, report) {
   const base = `assets/${key}/`;
   const HQ = key.endsWith("-hq");
@@ -151,6 +165,10 @@ async function loadVariant(key, report) {
       const r = def.roughMap ? 0.6 * (def.roughMul ?? 1) : def.rough ?? 0.5;
       m.envMapIntensity = def.coat > 0 ? 0.5 : r < 0.2 ? 0.9 : r < 0.45 ? 0.35 : 0.08;
       hqMaterials.add(m);
+    } else if ((def.metal ?? 0) >= 0.9) {
+      // mirrors, chrome, steel: baked diffuse is ~0 for metals, so reflect a soft room gradient instead
+      m = new THREE.MeshBasicMaterial({ envMap: metalEnv(), combine: THREE.MultiplyOperation, reflectivity: 1 });
+      m.color.setRGB(...(def.color || [0.8, 0.8, 0.8]), THREE.LinearSRGBColorSpace);
     } else {
       m = new THREE.MeshBasicMaterial();
       if (def.map && texCache[def.map]) m.map = texCache[def.map];
