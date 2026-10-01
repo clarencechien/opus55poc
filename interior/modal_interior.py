@@ -48,7 +48,9 @@ TEXTURES = ["laminate_floor_02", "laminate_floor_03", "tatami_mat", "ash_veneer"
             "clay_plaster", "beige_wall_001", "concrete_floor_02", "wool_boucle", "rough_linen", "marble_01", "marble_tiles",
             "gravel_floor", "bamboo_wall", "anti_slip_concrete", "jogging_melange"]
 HDRIS = [("ninomaru_teien", "4k")]
-MODELS = ["potted_plant_01", "potted_plant_04", "tea_set_01", "ceramic_vase_02", "rock_moss_set_01", "shrub_02", "tree_small_02"]
+MODELS = ["potted_plant_01", "potted_plant_04", "tea_set_01", "ceramic_vase_02", "rock_moss_set_01", "shrub_02", "tree_small_02",
+          "potted_plant_02", "ceramic_vase_01", "vintage_electric_kettle", "wooden_cutting_board", "pot_enamel_01", "wooden_bowl_01",
+          "wicker_basket_01", "wooden_stool_01", "wooden_bucket_01", "decorative_book_set_01", "outdoor_table_chair_set_01"]
 MAPS = ["Diffuse", "nor_gl", "Rough"]
 
 
@@ -88,13 +90,21 @@ def fetch_assets(root: str) -> None:
                 print("[assets] skip hdri", aid, e)
     for aid in MODELS:
         base = pathlib.Path(root) / "models" / aid
-        if (base / f"{aid}_1k.blend").exists():
+        if (base / f"{aid}_1k.blend").exists() and (base / ".gltf_checked").exists():
             continue
         try:
-            b = s.get(f"https://api.polyhaven.com/files/{aid}", timeout=60).json()["blend"]["1k"]["blend"]
+            d = s.get(f"https://api.polyhaven.com/files/{aid}", timeout=60).json()
+            b = d["blend"]["1k"]["blend"]
             for rel, inc in b.get("include", {}).items():
                 new += get(inc["url"], base / rel)
             new += get(b["url"], base / f"{aid}_1k.blend")
+            # newer Poly Haven .blend files may not open in Blender 4.2: keep the glTF as a fallback
+            g = d.get("gltf", {}).get("1k", {}).get("gltf")
+            if g:
+                for rel, inc in g.get("include", {}).items():
+                    new += get(inc["url"], base / rel)
+                new += get(g["url"], base / f"{aid}_1k.gltf")
+            (base / ".gltf_checked").touch()
         except Exception as e:  # noqa: BLE001
             print("[assets] skip model", aid, e)
     print(f"[assets] {new} new files", flush=True)
@@ -124,7 +134,7 @@ def render_shot(variant: str, shot: str, res: str, samples: int, extra: list[str
     t0 = time.time()
     fetch_assets(ASSETS); assets_vol.commit()
     out = pathlib.Path("/tmp/out"); out.mkdir(exist_ok=True)
-    name = f"{variant}_{shot}" + ("_night" if "--night" in extra else "")
+    name = (f"{variant}_audit" if "," in shot else f"{variant}_{shot}") + ("_night" if "--night" in extra else "")
     log = run_blender(["--variant", variant, "--shot", shot, "--assets", ASSETS, "--plan", f"{REMOTE}/plan.json",
                        "--out", str(out / f"{name}.png"), "--res", res, "--samples", str(samples), *extra])
     return {"files": {f.name: f.read_bytes() for f in out.glob(f"{name}*.png")}, "seconds": round(time.time() - t0, 1), "log": log}
@@ -146,6 +156,17 @@ def plan():
     png = rasterize.remote((HERE / "out" / "plan_empty.svg").read_bytes())
     (HERE / "out" / "plan_empty.png").write_bytes(png)
     print("wrote", HERE / "out" / "plan_empty.png", len(png))
+
+
+@app.local_entrypoint()
+def audit(variant: str = "wa", shots: str = "living,washitsu,dining,entry,master,master2,bath,garden,kitchen,br2,br4,br5,ba2,ba3,hall,balcony,svc",
+          res: str = "800x500", samples: int = 48, tag: str = "audit"):
+    """many shots from one scene build, in one container"""
+    dst = HERE / "out" / tag; dst.mkdir(parents=True, exist_ok=True)
+    r = render_shot.remote(variant, shots, res, samples, [])
+    for fname, data in r["files"].items():
+        (dst / fname).write_bytes(data)
+    print(f"[audit] {len(r['files'])} images in {r['seconds']} s -> {dst}")
 
 
 @app.local_entrypoint()
