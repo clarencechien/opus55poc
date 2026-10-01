@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>和風宅 影像導覽</title>
+<meta name="description" content="假 3D 概念驗證：只用預先渲染的 360° 全景、360° 移動影片與旋轉序列，手機幾乎不需要算力。">
+<meta name="theme-color" content="#26231f">
+<style>
+  :root {
+    --bg: #26231f; --panel: rgba(30, 28, 25, .78); --line: rgba(255, 255, 255, .14);
+    --ink: #f4efe6; --ink2: #cfc6b8; --accent: #c8a46a; --accent-ink: #1c1a17;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden;
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; }
+  .stage { position: fixed; inset: 0; touch-action: none; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #pano { opacity: 0; transition: opacity .5s; }
+  #pano.on { opacity: 1; }
+  #turn { transition: opacity .5s; }
+  #turn.off { opacity: 0; pointer-events: none; }
+  .bar { position: fixed; left: 0; right: 0; display: flex; gap: 8px; align-items: center; padding: 10px 12px;
+    padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); pointer-events: none; z-index: 3; }
+  .top { top: 0; padding-top: max(10px, env(safe-area-inset-top)); justify-content: space-between; flex-wrap: wrap; }
+  .bottom { bottom: 0; padding-bottom: max(12px, env(safe-area-inset-bottom)); flex-direction: column; align-items: center; }
+  .title, .seg, .hint, .stats { background: var(--panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--line); }
+  .title { pointer-events: auto; border-radius: 12px; padding: 7px 12px; line-height: 1.25; }
+  .title b { font-size: 15px; letter-spacing: .04em; }
+  .title small { display: block; font-size: 11.5px; color: var(--ink2); }
+  .title a { color: var(--accent); text-decoration: none; }
+  .seg { pointer-events: auto; display: inline-flex; border-radius: 999px; padding: 3px; }
+  .seg button { appearance: none; border: 0; background: transparent; color: var(--ink2); font: inherit; font-size: 14px;
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; min-width: 60px; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .hint { font-size: 12.5px; color: var(--ink2); border-radius: 999px; padding: 6px 14px; transition: opacity .6s; }
+  .stats { pointer-events: auto; margin-top: 8px; font-size: 11.5px; color: var(--ink2); border-radius: 10px; padding: 5px 10px; }
+  .pin { position: fixed; z-index: 2; transform: translate(-50%, -100%); pointer-events: auto; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 4px; transition: opacity .3s; }
+  .pin span { font-size: 13.5px; font-weight: 700; color: var(--accent-ink); background: var(--accent); border-radius: 999px;
+    padding: 5px 12px; white-space: nowrap; box-shadow: 0 4px 14px rgba(0, 0, 0, .35); }
+  .pin i { width: 14px; height: 14px; border-radius: 50%; border: 3px solid #fff; background: var(--accent);
+    box-shadow: 0 0 0 6px rgba(200, 164, 106, .35); }
+  .pin.floor { transform: translate(-50%, -50%); }
+  .pin.floor i { width: 46px; height: 46px; border-width: 2px; background: rgba(255, 255, 255, .18); transform: scaleY(.42);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, .15); order: 2; }
+  .pin.hide { opacity: 0; pointer-events: none; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 5; transition: opacity .6s; }
+  #loading .t { font-size: 17px; letter-spacing: .12em; }
+  #loading .s { margin-top: 8px; font-size: 12px; color: var(--ink2); text-align: center; }
+  @media (max-width: 520px) { .title small { display: none; } .seg button { padding: 7px 11px; min-width: 48px; font-size: 13px; } }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="turn" aria-label="模型旋轉"></canvas>
+</div>
+<div class="stage" id="panoStage" style="pointer-events:none">
+  <canvas id="pano" aria-label="360 度全景"></canvas>
+</div>
+<div id="pins"></div>
+
+<div class="bar top">
+  <div class="title"><b>68 坪・和風宅　影像導覽</b><small>概念驗證：只有圖片與影片，沒有即時 3D 場景 · <a href="../viewer/">3D 導覽</a> · <a href="../">對照頁</a></small></div>
+  <div class="seg" role="group" aria-label="位置">
+    <button id="bModel" aria-pressed="true">模型</button>
+    <button id="bLiving" aria-pressed="false">客廳</button>
+    <button id="bWashitsu" aria-pressed="false">和室</button>
+  </div>
+</div>
+<div class="bar bottom">
+  <div class="hint" id="hint">拖曳旋轉模型・點房間進入</div>
+  <div class="stats" id="stats"></div>
+</div>
+<div id="loading"><div><div class="t">載入中</div><div class="s" id="lstat">旋轉序列…</div></div></div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+</script>
+<script type="module" src="tour.js"></script>
+</body>
+</html>
