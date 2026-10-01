@@ -23,48 +23,59 @@ function pressed(id) {
 }
 const loadImage = (src) => new Promise((res, rej) => { const i = new Image(); i.decoding = "async"; i.onload = () => res(i); i.onerror = rej; i.src = src; });
 
-// ------------------------------------------------------------------ turntable (model)
+// ------------------------------------------------------------------ model: 8 fixed views
+// No free rotation and no blending (blending two angles is what leaves ghost edges). Moving to the next view plays
+// the pre-rendered in-between frames one after another as crisp single images, ~0.3 s per 45°.
 const tcv = $("turn"), tctx = tcv.getContext("2d");
-let meta = null, frames = [], fi = 0, target = 0, vel = 0, auto = true, tDirty = true, rect = { x: 0, y: 0, w: 1, h: 1 };
+const VIEWS = 8, SPIN_FPS = 30;
+let meta = null, frames = [], ci = 0, view = 0, spinning = false, rect = { x: 0, y: 0, w: 1, h: 1 };
 const turnPins = {};
 
 function sizeTurn() {
   const dpr = Math.min(devicePixelRatio, 2);
   tcv.width = innerWidth * dpr; tcv.height = innerHeight * dpr;
-  const iw = 1440, ih = 900, portrait = innerWidth < innerHeight;
-  const sc = Math.min(innerWidth / iw, (innerHeight - 40) / ih) * (portrait ? 1.45 : 1.02);   // portrait: crop the empty sides
-  rect = { w: iw * sc, h: ih * sc }; rect.x = (innerWidth - rect.w) / 2; rect.y = (innerHeight - rect.h) / 2 + 10;
-  tDirty = true;
+  // keep the model between the title bar and the view controls
+  const iw = 1440, ih = 900, portrait = innerWidth < innerHeight, top = portrait ? 100 : 56, bottom = 150;
+  const band = innerHeight - top - bottom;
+  const sc = Math.min(innerWidth / iw, band / ih) * (portrait ? 1.45 : 1.08);   // frames carry empty margins; portrait crops the sides
+  rect = { w: iw * sc, h: ih * sc }; rect.x = (innerWidth - rect.w) / 2; rect.y = top + (band - rect.h) / 2;
+  if (meta) drawTurn();
 }
 
 function drawTurn() {
-  const n = meta.n, dpr = tcv.width / innerWidth;
-  const f = ((fi % n) + n) % n, i0 = Math.floor(f), i1 = (i0 + 1) % n, raw = f - i0;
-  // 5° between frames: hold each frame for most of the step and blend only around the switch (no doubled edges)
-  const u = Math.min(1, Math.max(0, (raw - 0.3) / 0.4)), t = u * u * (3 - 2 * u);
+  const dpr = tcv.width / innerWidth, im = frames[ci];
+  if (!im) return;
   tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   tctx.fillStyle = "#26231f"; tctx.fillRect(0, 0, innerWidth, innerHeight);
-  const a = frames[i0], b = frames[i1];
-  if (a) { tctx.globalAlpha = 1; tctx.drawImage(a, rect.x, rect.y, rect.w, rect.h); }
-  if (b && t > 0.01) { tctx.globalAlpha = t; tctx.drawImage(b, rect.x, rect.y, rect.w, rect.h); }
-  tctx.globalAlpha = 1;
-  const p0 = meta.nodes[i0], p1 = meta.nodes[i1];
+  tctx.drawImage(im, rect.x, rect.y, rect.w, rect.h);
+  const p = meta.nodes[ci];
   for (const [id, el] of Object.entries(turnPins)) {
-    const x = p0[id][0] * (1 - t) + p1[id][0] * t, y = p0[id][1] * (1 - t) + p1[id][1] * t;
-    el.style.left = `${rect.x + x * rect.w}px`; el.style.top = `${rect.y + (1 - y) * rect.h}px`;
+    el.style.left = `${rect.x + p[id][0] * rect.w}px`; el.style.top = `${rect.y + (1 - p[id][1]) * rect.h}px`;
+    el.classList.toggle("hide", spinning || mode !== "model");
   }
+  const dots = $("dots");
+  if (dots) [...dots.children].forEach((d, k) => d.classList.toggle("on", k === view));
 }
 
-function turnLoop() {
-  if (mode === "model") {
-    if (auto) target += 0.02;                                    // ~6°/s idle spin
-    else if (Math.abs(vel) > 0.001) { target += vel; vel *= 0.9; }
-    const d = target - fi;
-    if (Math.abs(d) > 0.0005) { fi += d * 0.22; tDirty = true; }  // ease toward the finger so steps never jump
-    if (tDirty) { drawTurn(); tDirty = false; }
-  }
-  requestAnimationFrame(turnLoop);
+function goView(k) {
+  if (!meta || spinning || mode !== "model") return;
+  const n = meta.n, step = n / VIEWS, delta = k - view;
+  if (!delta) return;
+  const dir = Math.sign(delta), total = Math.abs(delta) * step;
+  view = ((k % VIEWS) + VIEWS) % VIEWS;
+  spinning = true; drawTurn();
+  const t0 = performance.now();
+  let done = 0;
+  const tick = (now) => {
+    const due = Math.min(total, Math.floor((now - t0) / (1000 / SPIN_FPS)));
+    while (done < due) { done++; ci = (ci + dir + n) % n; }    // a frame not downloaded yet is simply skipped
+    if (done >= total) { ci = view * step; spinning = false; }
+    drawTurn();
+    if (spinning) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
+const nextView = () => goView(view + 1), prevView = () => goView(view - 1);
 
 function makePin(label, floor, onClick) {
   const el = document.createElement("div");
@@ -81,27 +92,34 @@ async function initTurn() {
   meta.nodes = Object.values(meta.nodes);
   frames = new Array(meta.n);
   frames[0] = await loadImage(ASSET + "turn_000.jpg");
-  sizeTurn(); drawTurn();
-  $("loading").style.opacity = 0; setTimeout(() => $("loading").remove(), 700);
   for (const [id, nd] of Object.entries(NODES)) turnPins[id] = makePin(nd.name, false, () => enter(id));
-  // the rest of the ring: every 4th frame first so a coarse rotation works almost at once
-  const order = [];
-  for (const step of [6, 3, 1]) for (let i = 0; i < meta.n; i += step) if (!order.includes(i) && i) order.push(i);
-  for (const i of order) loadImage(ASSET + `turn_${String(i).padStart(3, "0")}.jpg`).then((im) => { frames[i] = im; tDirty = true; });
-  requestAnimationFrame(turnLoop);
+  const dots = $("dots");
+  for (let k = 0; k < VIEWS; k++) {
+    const b = document.createElement("button"); b.setAttribute("aria-label", `視角 ${k + 1}`);
+    b.onclick = () => { if (k !== view) goView(view + ((k - view + VIEWS + VIEWS / 2) % VIEWS) - VIEWS / 2); };
+    dots.appendChild(b);
+  }
+  sizeTurn();
+  $("loading").style.opacity = 0; setTimeout(() => $("loading").remove(), 700);
+  // the 8 resting views first, then the in-between frames used for the turn animation
+  const step = meta.n / VIEWS, order = [];
+  for (let k = 1; k < VIEWS; k++) order.push(k * step);
+  for (let i = 1; i < meta.n; i++) if (i % step) order.push(i);
+  for (const i of order) loadImage(ASSET + `turn_${String(i).padStart(3, "0")}.jpg`).then((im) => { frames[i] = im; });
 }
 
 {
-  let last = null;
+  let x0 = null;
   const stage = $("stage");
-  stage.addEventListener("pointerdown", (e) => { if (mode !== "model") return; last = e.clientX; auto = false; vel = 0; stage.setPointerCapture(e.pointerId); });
-  stage.addEventListener("pointermove", (e) => {
-    if (last === null) return;
-    const d = (e.clientX - last) / 8; last = e.clientX;       // ~0.6° per pixel
-    target -= d; vel = -d * 0.5;
+  stage.addEventListener("pointerdown", (e) => { if (mode === "model") x0 = e.clientX; });
+  stage.addEventListener("pointerup", (e) => {
+    if (x0 === null) return;
+    const dx = e.clientX - x0; x0 = null;
+    if (Math.abs(dx) > 30) (dx < 0 ? nextView : prevView)();       // swipe = one view, never a free spin
   });
-  const up = () => { last = null; };
-  stage.addEventListener("pointerup", up); stage.addEventListener("pointercancel", up);
+  stage.addEventListener("pointercancel", () => { x0 = null; });
+  $("vPrev").onclick = prevView; $("vNext").onclick = nextView;
+  addEventListener("keydown", (e) => { if (mode !== "model") return; if (e.key === "ArrowRight") nextView(); if (e.key === "ArrowLeft") prevView(); });
 }
 
 // ------------------------------------------------------------------ 360 panoramas and clips
@@ -195,6 +213,7 @@ async function enter(id) {
   mode = "pano"; pressed(NODES[id].btn);
   pcv.classList.add("on"); $("panoStage").style.pointerEvents = "auto"; $("turn").classList.add("off");
   for (const el of Object.values(turnPins)) el.classList.add("hide");
+  $("viewNav").classList.add("hide");
   setHint("拖曳環顧・點地上的圓圈移動・雙指縮放");
   busy = false;
   texFor(id, "4k").then((t) => { if (node === id && !playing) showPano(id, t); });
@@ -205,9 +224,9 @@ function backToModel() {
   if (busy) return;
   mode = "model"; node = null; pressed("bModel");
   pcv.classList.remove("on"); $("panoStage").style.pointerEvents = "none"; $("turn").classList.remove("off");
-  for (const el of Object.values(turnPins)) el.classList.remove("hide");
   for (const el of Object.values(floorPins)) el.classList.add("hide");
-  setHint("拖曳旋轉模型・點房間進入"); tDirty = true;
+  $("viewNav").classList.remove("hide");
+  setHint("左右滑動或點箭頭換視角・點房間進入"); drawTurn();
 }
 
 function tween(ms, fn) {
@@ -318,5 +337,5 @@ function stats() {
 }
 setInterval(stats, 1000);
 
-window.__tour = { enter, move, backToModel, look(y, p) { yaw = y; pitch = p; req(); }, get state() { return { mode, node, yaw, pitch, drawn, fi }; }, NODES };
+window.__tour = { enter, move, backToModel, look(y, p) { yaw = y; pitch = p; req(); }, get state() { return { mode, node, yaw, pitch, drawn, ci, view, spinning }; }, nextView, prevView, NODES };
 initTurn().catch((e) => { $("lstat").textContent = "載入失敗：" + e.message; });

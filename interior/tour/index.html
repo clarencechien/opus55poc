@@ -39,6 +39,15 @@
     padding: 8px 14px; border-radius: 999px; cursor: pointer; min-width: 60px; }
   .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
   .hint { font-size: 12.5px; color: var(--ink2); border-radius: 999px; padding: 6px 14px; transition: opacity .6s; }
+  .viewnav { pointer-events: auto; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; transition: opacity .3s; }
+  .viewnav.hide { opacity: 0; pointer-events: none; }
+  .viewnav > button { appearance: none; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink); font-size: 26px; line-height: 1; cursor: pointer;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .dots { display: flex; gap: 2px; }
+  .dots button { appearance: none; border: 0; background: transparent; padding: 8px 4px; cursor: pointer; }
+  .dots button::after { content: ""; display: block; width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, .3); }
+  .dots button.on::after { background: var(--accent); }
   .stats { pointer-events: auto; margin-top: 8px; font-size: 11.5px; color: var(--ink2); border-radius: 10px; padding: 5px 10px; }
   .pin { position: fixed; z-index: 2; transform: translate(-50%, -100%); pointer-events: auto; cursor: pointer;
     display: flex; flex-direction: column; align-items: center; gap: 4px; transition: opacity .3s; }
@@ -74,7 +83,12 @@
   </div>
 </div>
 <div class="bar bottom">
-  <div class="hint" id="hint">拖曳旋轉模型・點房間進入</div>
+  <div class="viewnav" id="viewNav">
+    <button id="vPrev" aria-label="上一個視角">‹</button>
+    <div class="dots" id="dots"></div>
+    <button id="vNext" aria-label="下一個視角">›</button>
+  </div>
+  <div class="hint" id="hint">左右滑動或點箭頭換視角・點房間進入</div>
   <div class="stats" id="stats"></div>
 </div>
 <div id="loading"><div><div class="t">載入中</div><div class="s" id="lstat">旋轉序列…</div></div></div>
