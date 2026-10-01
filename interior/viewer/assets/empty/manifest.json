@@ -3,7 +3,7 @@
  "lightmaps": {
   "BAKE_arch": {
    "file": "lm_arch.jpg",
-   "intensity": 7.1902154789066985,
+   "intensity": 7.193667657054905,
    "size": 4096
   }
  },
@@ -139,7 +139,7 @@
  "exposure": 2.4000000953674316,
  "vertexlit": {
   "VC_furn": {
-   "intensity": 2.302190682244301
+   "intensity": 2.302190408062935
   }
  },
  "sky": {

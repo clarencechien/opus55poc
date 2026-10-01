@@ -3,12 +3,12 @@
  "lightmaps": {
   "BAKE_arch": {
    "file": "lm_arch.jpg",
-   "intensity": 89.74433693256289,
+   "intensity": 91.77119356490199,
    "size": 4096
   },
   "BAKE_furn": {
    "file": "lm_furn.jpg",
-   "intensity": 23.22548855769243,
+   "intensity": 25.187845254346726,
    "size": 2048
   }
  },
@@ -24,6 +24,17 @@
    "rough": 0.35,
    "metal": 0.8
   },
+  "appliance": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.86,
+    0.86,
+    0.84
+   ],
+   "rough": 0.35,
+   "metal": 0.0
+  },
   "ash": {
    "type": "baked",
    "map": "tex/ash.jpg",
@@ -33,17 +44,6 @@
     1
    ],
    "rough": 0.45,
-   "metal": 0.0
-  },
-  "balcony": {
-   "type": "baked",
-   "map": "tex/balcony.jpg",
-   "color": [
-    1,
-    1,
-    1
-   ],
-   "rough": 0.5,
    "metal": 0.0
   },
   "bamboo": {
@@ -134,6 +134,17 @@
    "rough": 0.5,
    "metal": 0.0
   },
+  "chrome": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.86,
+    0.86,
+    0.86
+   ],
+   "rough": 0.1,
+   "metal": 1.0
+  },
   "cushion": {
    "type": "baked",
    "map": null,
@@ -154,6 +165,17 @@
     0.05
    ],
    "rough": 0.4,
+   "metal": 0.0
+  },
+  "deck": {
+   "type": "baked",
+   "map": "tex/deck.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.6,
    "metal": 0.0
   },
   "downlight": {
@@ -193,6 +215,20 @@
   "glass_rail": {
    "type": "glass"
   },
+  "glass_thin": {
+   "type": "glass"
+  },
+  "graphite": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.09,
+    0.09,
+    0.095
+   ],
+   "rough": 0.35,
+   "metal": 0.0
+  },
   "gravel": {
    "type": "baked",
    "map": "tex/gravel.jpg",
@@ -224,6 +260,17 @@
     0.28
    ],
    "rough": 0.85,
+   "metal": 0.0
+  },
+  "induction": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.012,
+    0.012,
+    0.014
+   ],
+   "rough": 0.04,
    "metal": 0.0
   },
   "lacquer": {
@@ -299,6 +346,17 @@
    "rough": 0.425,
    "metal": 0.0
   },
+  "olive": {
+   "type": "baked",
+   "map": "tex/olive.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0
+  },
   "paint": {
    "type": "baked",
    "map": null,
@@ -330,6 +388,17 @@
     0.88
    ],
    "rough": 0.08,
+   "metal": 0.0
+  },
+  "rug": {
+   "type": "baked",
+   "map": "tex/rug.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
    "metal": 0.0
   },
   "scroll": {
@@ -409,6 +478,28 @@
    "rough": 0.5,
    "metal": 0.0
   },
+  "towel": {
+   "type": "baked",
+   "map": "tex/towel.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0
+  },
+  "towel_indigo": {
+   "type": "baked",
+   "map": "tex/towel_indigo.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0
+  },
   "walnut": {
    "type": "baked",
    "map": "tex/walnut.jpg",
@@ -458,7 +549,7 @@
  "exposure": 1.5,
  "vertexlit": {
   "VC_furn": {
-   "intensity": 12.568006007671382
+   "intensity": 31.056903858280844
   }
  },
  "sky": {

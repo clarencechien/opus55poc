@@ -94,6 +94,18 @@ function loadGLB(url, onProg) {
   return new Promise((res, rej) => loader.load(url, res, (e) => e.total && onProg && onProg(e.loaded / e.total), rej));
 }
 
+let _metalEnv = null;
+function metalEnv() {        // warm ceiling-to-floor gradient used as a cheap reflection for metals in standard mode
+  if (_metalEnv) return _metalEnv;
+  const c = document.createElement("canvas"); c.width = 64; c.height = 32;
+  const g = c.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 32);
+  gr.addColorStop(0, "#f4eee4"); gr.addColorStop(0.45, "#cfc5b8"); gr.addColorStop(0.55, "#8d8379"); gr.addColorStop(1, "#5a524a");
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 32);
+  _metalEnv = new THREE.CanvasTexture(c);
+  _metalEnv.mapping = THREE.EquirectangularReflectionMapping; _metalEnv.colorSpace = THREE.SRGBColorSpace;
+  return _metalEnv;
+}
+
 async function loadVariant(key, report) {
   const base = `assets/${key}/`;
   const HQ = key.endsWith("-hq");
@@ -153,6 +165,10 @@ async function loadVariant(key, report) {
       const r = def.roughMap ? 0.6 * (def.roughMul ?? 1) : def.rough ?? 0.5;
       m.envMapIntensity = def.coat > 0 ? 0.5 : r < 0.2 ? 0.9 : r < 0.45 ? 0.35 : 0.08;
       hqMaterials.add(m);
+    } else if ((def.metal ?? 0) >= 0.9) {
+      // mirrors, chrome, steel: baked diffuse is ~0 for metals, so reflect a soft room gradient instead
+      m = new THREE.MeshBasicMaterial({ envMap: metalEnv(), combine: THREE.MultiplyOperation, reflectivity: 1 });
+      m.color.setRGB(...(def.color || [0.8, 0.8, 0.8]), THREE.LinearSRGBColorSpace);
     } else {
       m = new THREE.MeshBasicMaterial();
       if (def.map && texCache[def.map]) m.map = texCache[def.map];

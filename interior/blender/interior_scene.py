@@ -1432,7 +1432,13 @@ def build_wa():
     sub.append((b_, ["ceramic"], True)); sub.append((s_, ["lamp_paper"]))
     wd, fb = dining_chair(Matrix.Translation((dx0 - 0.12, (dy0 + dy1) / 2, 0)) @ Matrix.Rotation(-math.pi / 2, 4, "Z"))
     sub.append((wd, ["walnut"])); sub.append((fb, ["chair_fabric"], True))
-    place_model("decorative_book_set_01", dx1 - 0.13, (dy0 + dy1) / 2 + 0.2, 1.275, -math.pi / 2, height=0.24, name="books")
+    bk = MB(); x_ = dy0 + 0.1                                                         # a row of books on the upper shelf
+    for k, (hh, tt, mi) in enumerate(((0.24, 0.03, 0), (0.22, 0.025, 1), (0.26, 0.035, 2), (0.21, 0.02, 3), (0.23, 0.04, 4), (0.25, 0.03, 1),
+                                       (0.2, 0.028, 0), (0.24, 0.022, 2), (0.22, 0.032, 4), (0.19, 0.05, 3))):
+        bk.box(dx1 - 0.22, x_, 1.645, dx1 - 0.03, x_ + tt, 1.645 + hh, mi); x_ += tt + 0.002
+    for k in range(3):
+        bk.box(dx1 - 0.21, dy0 + 0.5 + k * 0.035, 1.275, dx1 - 0.04, dy0 + 0.53 + k * 0.035 - 0.004, 1.275 + 0.22 - 0.02 * k, k)
+    sub.append((bk, ["indigo", "linen", "olive", "dark_wood", "scroll"]))
     dl = MB(); downlight_grid(dl, *P(410, 440), 1, 0.16, 20); sub.append((dl, ["downlight"]))
 
     # ---------- baths 2/3: wainscot marble, full-height marble glass shower with rain head, vessel basin on a floating

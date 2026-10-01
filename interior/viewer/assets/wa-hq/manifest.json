@@ -3,17 +3,17 @@
  "lightmaps": {
   "BAKE_arch": {
    "file": "lm_arch.jpg",
-   "intensity": 35.558225488126375,
+   "intensity": 35.2423139343427,
    "size": 4096
   },
   "BAKE_furn": {
    "file": "lm_furn.jpg",
-   "intensity": 24.298862308391517,
+   "intensity": 27.633250438921085,
    "size": 4096
   },
   "BAKE_arch_h": {
    "file": "lm_arch_h.jpg",
-   "intensity": 150.64282704846653,
+   "intensity": 158.614546151663,
    "size": 4096
   }
  },
@@ -34,6 +34,22 @@
    "roughMul": 1.0,
    "coat": 0.0
   },
+  "appliance": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.86,
+    0.86,
+    0.84
+   ],
+   "rough": 0.35,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
   "ash": {
    "type": "baked",
    "map": "tex/ash.jpg",
@@ -48,22 +64,6 @@
    "roughMap": "tex/ash_r.jpg",
    "normalScale": 0.25,
    "roughMul": 0.9,
-   "coat": 0.0
-  },
-  "balcony": {
-   "type": "baked",
-   "map": "tex/balcony.jpg",
-   "color": [
-    1,
-    1,
-    1
-   ],
-   "rough": 0.5,
-   "metal": 0.0,
-   "normalMap": "tex/balcony_n.jpg",
-   "roughMap": "tex/balcony_r.jpg",
-   "normalScale": 0.4,
-   "roughMul": 1.0,
    "coat": 0.0
   },
   "bamboo": {
@@ -194,6 +194,22 @@
    "roughMul": 1.0,
    "coat": 0.0
   },
+  "chrome": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.86,
+    0.86,
+    0.86
+   ],
+   "rough": 0.1,
+   "metal": 1.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
   "cushion": {
    "type": "baked",
    "map": null,
@@ -224,6 +240,22 @@
    "roughMap": null,
    "normalScale": 0.5,
    "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "deck": {
+   "type": "baked",
+   "map": "tex/deck.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.6,
+   "metal": 0.0,
+   "normalMap": "tex/deck_n.jpg",
+   "roughMap": "tex/deck_r.jpg",
+   "normalScale": 0.5,
+   "roughMul": 1.2,
    "coat": 0.0
   },
   "downlight": {
@@ -273,6 +305,25 @@
   "glass_rail": {
    "type": "glass"
   },
+  "glass_thin": {
+   "type": "glass"
+  },
+  "graphite": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.09,
+    0.09,
+    0.095
+   ],
+   "rough": 0.35,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
   "gravel": {
    "type": "baked",
    "map": "tex/gravel.jpg",
@@ -314,6 +365,22 @@
     0.28
    ],
    "rough": 0.85,
+   "metal": 0.0,
+   "normalMap": null,
+   "roughMap": null,
+   "normalScale": 0.5,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "induction": {
+   "type": "baked",
+   "map": null,
+   "color": [
+    0.012,
+    0.012,
+    0.014
+   ],
+   "rough": 0.04,
    "metal": 0.0,
    "normalMap": null,
    "roughMap": null,
@@ -467,6 +534,22 @@
    "roughMul": 1.0,
    "coat": 0.0
   },
+  "rug": {
+   "type": "baked",
+   "map": "tex/rug.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/rug_n.jpg",
+   "roughMap": "tex/rug_r.jpg",
+   "normalScale": 1.2,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
   "scroll": {
    "type": "baked",
    "map": null,
@@ -579,6 +662,38 @@
    "roughMul": 1.0,
    "coat": 0.0
   },
+  "towel": {
+   "type": "baked",
+   "map": "tex/towel.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/towel_n.jpg",
+   "roughMap": "tex/towel_r.jpg",
+   "normalScale": 1.3,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
+  "towel_indigo": {
+   "type": "baked",
+   "map": "tex/towel_indigo.jpg",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "rough": 0.5,
+   "metal": 0.0,
+   "normalMap": "tex/towel_indigo_n.jpg",
+   "roughMap": "tex/towel_indigo_r.jpg",
+   "normalScale": 1.3,
+   "roughMul": 1.0,
+   "coat": 0.0
+  },
   "walnut": {
    "type": "baked",
    "map": "tex/walnut.jpg",
@@ -648,7 +763,7 @@
  "exposure": 1.5,
  "vertexlit": {
   "VC_furn": {
-   "intensity": 12.568006443071392
+   "intensity": 31.08398348836899
   }
  },
  "sky": {

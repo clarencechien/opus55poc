@@ -383,7 +383,16 @@ def run(A, sc, MATS, tick):
         json.dump(manifest, open(os.path.join(out, "manifest.json"), "w"), ensure_ascii=False, indent=1)
         return
     props = [o for o in sc.objects if o.name.startswith("P_")]
-    # phone budget: decimate imported props and shrink their textures
+    # phone budget: decimate imported props (per object and per prop) and shrink their textures
+
+    def root_of(o):
+        while o.parent:
+            o = o.parent
+        return o.name
+    root_tris = {}
+    for o in props:
+        if o.type == "MESH":
+            root_tris[root_of(o)] = root_tris.get(root_of(o), 0) + sum(len(p.vertices) - 2 for p in o.data.polygons)
     for o in props:
         if o.type in ("MESH", "CURVE"):
             if o.type == "CURVE":
@@ -395,8 +404,11 @@ def run(A, sc, MATS, tick):
             tris = sum(len(p.vertices) - 2 for p in o.data.polygons)
             leafy = any(sl.material and any(k in sl.material.name.lower() for k in ("leaf", "leaves", "alpha")) for sl in o.material_slots)
             cap = 30000 if leafy else 4000                       # leaf cards break when decimated
-            if tris > cap:
-                md = o.modifiers.new("dec", "DECIMATE"); md.ratio = max(0.02, cap / tris)
+            ratio = min(1.0, cap / tris)
+            if not leafy:                                        # whole prop at most ~8000 tris
+                ratio = min(ratio, 8000 / max(1, root_tris.get(root_of(o), tris)))
+            if ratio < 1.0:
+                md = o.modifiers.new("dec", "DECIMATE"); md.ratio = max(0.02, ratio)
                 print(f"[props] {o.name}: {tris} tris -> ratio {md.ratio:.3f}")
     props = [o for o in sc.objects if o.name.startswith("P_") and not o.name.startswith("X_")]
     realize([o for o in props if o.type == "MESH"])
