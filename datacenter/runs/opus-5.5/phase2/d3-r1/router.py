@@ -4,8 +4,8 @@ import numpy as np
 C = 0.102
 SEP = 0.153
 ZMIN, ZMAX = 2.75, 3.498
-TIME_BUDGET = globals().get('TIME_BUDGET', 60.0)
-ORDERS = globals().get('ORDERS', None)
+TIME_BUDGET = 150.0
+RND = random.Random(7)
 
 PORTS = {'P1': (23.55, 7.7, 3.0), 'P2': (23.55, 7.95, 3.0), 'P3': (23.55, 8.2, 3.0),
          'P4': (23.55, 8.45, 3.0), 'P5': (23.55, 8.7, 3.0), 'P6': (23.55, 8.95, 3.0)}
@@ -37,8 +37,7 @@ def seg_boxes(pts, infl):
     return out
 
 
-def route(pid, extra, maxb=8):
-    """extra: list of (lo,hi) already-inflated boxes (other pipes / reservations); checked over full length."""
+def route(pid, extra, maxb=8, jit=0.0):
     port = PORTS[pid]; tgt = TGTS[pid]
     obs = []
     for lo, hi, nm in static:
@@ -75,16 +74,14 @@ def route(pid, extra, maxb=8):
         bey[xi[0]:xi[1], myi[0]:myi[1], zi[0]:zi[1]] = True
         bez[xi[0]:xi[1], yi[0]:yi[1], mzi[0]:mzi[1]] = True
     BN = bn.ravel().tolist()
-    # edge blocked lists indexed by lower node flat index
+
     def flat(i, j, k): return (i * ny + j) * nz + k
     BEX = np.ones((nx, ny, nz), bool); BEX[:-1] = bex; BEX = BEX.ravel().tolist()
     BEY = np.ones((nx, ny, nz), bool); BEY[:, :-1] = bey; BEY = BEY.ravel().tolist()
     BEZ = np.ones((nx, ny, nz), bool); BEZ[:, :, :-1] = bez; BEZ = BEZ.ravel().tolist()
     XL = xs.tolist(); YL = ys.tolist(); ZL = zs.tolist()
-    sx = XL.index(round(port[0], 6)) if round(port[0], 6) in XL else int(np.argmin(abs(xs - port[0])))
     s = flat(int(np.argmin(abs(xs - port[0]))), int(np.argmin(abs(ys - port[1]))), int(np.argmin(abs(zs - port[2]))))
     ti = int(np.argmin(abs(xs - tgt[0]))); tj = int(np.argmin(abs(ys - tgt[1])))
-    # goal column validity
     goal = {}
     for k in range(nz):
         zk = ZL[k]
@@ -104,13 +101,13 @@ def route(pid, extra, maxb=8):
         if ok and not BN[flat(ti, tj, k)]:
             goal[flat(ti, tj, k)] = zk - tgt[2]
     SX = ny * nz; SY = nz
-    nxyz = (nx, ny, nz)
     GOAL = -2
     heap = [(0.0, 0.0, 0, s, -1, None)]
     settled = {}
     parents = {}
     opp = [1, 0, 3, 2, 5, 4]
     found = None
+    rr = RND.random
     while heap:
         cost, L, b, n, d, par = heapq.heappop(heap)
         if n == GOAL:
@@ -124,7 +121,7 @@ def route(pid, extra, maxb=8):
             nb = b + (0 if d in (5, -1) else 1)
             if nb <= maxb:
                 dl = goal[n]
-                heapq.heappush(heap, (L + dl + 1e-4 * nb, L + dl, nb, GOAL, 5, me))
+                heapq.heappush(heap, (cost - L + L + dl + 1e-4 * (nb - b), L + dl, nb, GOAL, 5, me))
         i = n // SX; j = (n // SY) % ny; k = n % nz
         for nd in range(6):
             if d >= 0 and nd == opp[d]: continue
@@ -156,7 +153,9 @@ def route(pid, extra, maxb=8):
                 dl = ZL[k] - ZL[k - 1]
             if BN[m]: continue
             if settled.get(m * 7 + nd + 1, 99) <= nb: continue
-            heapq.heappush(heap, (L + dl + 1e-4 * nb, L + dl, nb, m, nd, me))
+            c2 = cost + dl + 1e-4 * (nb - b)
+            if jit: c2 += jit * rr()
+            heapq.heappush(heap, (c2, L + dl, nb, m, nd, me))
     if found is None:
         return None
     L, b, par = found
@@ -220,7 +219,7 @@ def check(routes):
         if max(abs(pts[-1][i] - TGTS[pid][i]) for i in range(3)) > 0.01: e.append('C1 tgt')
         sm, Ltot = samples(pts)
         S[pid] = sm
-        md = 9
+        md = 9; mn = ''
         for p, s in sm:
             if s <= 0.3 or s >= Ltot - 0.3: continue
             for lo, hi, nm in static:
@@ -234,6 +233,7 @@ def check(routes):
                 if ((p[0] - t[0]) ** 2 + (p[1] - t[1]) ** 2) ** 0.5 > 0.3 or p[2] < 2.6 - 1e-9: e.append('C3 low'); break
         bends = len(pts) - 2
         if bends > 8: e.append('C4 %d' % bends)
+        e.append('minC2 %.4f %s' % (md, mn))
         errs[pid] = e
     ids = [k for k in routes if routes[k] is not None]
     for x in range(len(ids)):
@@ -243,8 +243,8 @@ def check(routes):
             for chunk in range(0, len(A), 500):
                 D = np.sqrt(((A[chunk:chunk + 500, None, :] - B[None, :, :]) ** 2).sum(-1)).min()
                 md = min(md, D)
-            if md < 0.15:
-                errs[ids[x]].append('C5 %s %.4f' % (ids[y], md)); errs[ids[y]].append('C5 %s %.4f' % (ids[x], md))
+            if md < 0.16:
+                errs[ids[x]].append('sep %s %.4f' % (ids[y], md)); errs[ids[y]].append('sep %s %.4f' % (ids[x], md))
     return errs
 
 
@@ -256,7 +256,7 @@ for pid in IDS:
 print('LREF', {k: round(v, 3) for k, v in LREF.items()}, 'time %.1f' % (time.time() - t0))
 
 
-def run_order(order):
+def run_order(order, jit):
     done = {}
     for pid in order:
         extra = []
@@ -267,7 +267,7 @@ def run_order(order):
                 extra += seg_boxes([PORTS[q], (PORTS[q][0] - 0.05, PORTS[q][1], PORTS[q][2])], SEP)
                 t = TGTS[q]
                 extra += seg_boxes([t, (t[0], t[1], 2.75)], SEP)
-        r = route(pid, extra)
+        r = route(pid, extra, jit=jit)
         done[pid] = r
         if r is None:
             break
@@ -283,21 +283,23 @@ def score(done):
 
 
 best = None
-tried = set()
-orders = ORDERS or [IDS, IDS[::-1], sorted(IDS, key=lambda k: LREF[k]), sorted(IDS, key=lambda k: -LREF[k])]
-rnd = random.Random(1)
+orders = [['P1', 'P6', 'P3', 'P2', 'P4', 'P5'], ['P1', 'P3', 'P6', 'P2', 'P4', 'P5'], ['P1', 'P6', 'P2', 'P3', 'P4', 'P5'],
+          ['P3', 'P4', 'P2', 'P5', 'P6', 'P1'], ['P6', 'P1', 'P3', 'P5', 'P4', 'P2']]
+it = 0
 while time.time() - t0 < TIME_BUDGET:
     if orders:
-        order = list(orders.pop(0))
+        order = list(orders.pop(0)); jit = 0.0 if it < 3 else 1e-6
     else:
-        order = IDS[:]; rnd.shuffle(order)
-    if tuple(order) in tried: continue
-    tried.add(tuple(order))
-    done = run_order(order)
+        order = IDS[:]; RND.shuffle(order); jit = 1e-6
+    it += 1
+    done = run_order(order, jit)
     sc = score(done)
-    print('order', order, 'score %.2f' % sc, 'time %.1f' % (time.time() - t0))
-    if best is None or sc > best[0]:
+    print('order', ''.join(o[1] for o in order), 'j' if jit else '-', 'score %.3f' % sc,
+          ' '.join('%s:%.3f' % (p, length(done[p]) - LREF[p]) if done.get(p) else p + ':X' for p in IDS))
+    if best is None or sc > best[0] + 1e-9:
         best = (sc, order, done)
+    if sc > 99.9999:
+        break
 
 sc, order, done = best
 errs = check(done)
@@ -306,5 +308,5 @@ for pid in IDS:
     if r:
         print(pid, 'L=%.3f ref=%.3f bends=%d' % (length(r), LREF[pid], len(r) - 2), errs.get(pid))
 out = {'units': 'm', 'routes': [{'id': pid, 'points': done[pid]} for pid in IDS if done.get(pid)]}
-print('BEST', order, '%.2f' % sc)
+print('BEST', order, '%.3f' % sc, 'time %.1f' % (time.time() - t0))
 print('JSON' + json.dumps(out))
