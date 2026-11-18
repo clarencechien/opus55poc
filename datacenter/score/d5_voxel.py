@@ -275,7 +275,7 @@ def cast_shell(verts: np.ndarray, tris: np.ndarray, grid: Grid, occ: np.ndarray,
             diff = np.zeros((i1 - i0, j1 - j0, zb - za + 1), np.int16)
             np.add.at(diff, (pi_ - i0, pj_ - j0, k0 - za), 1)
             np.add.at(diff, (pi_ - i0, pj_ - j0, k1 - za), -1)
-            occ[i0:i1, j0:j1, za:zb] |= np.cumsum(diff, axis=2)[:, :, :-1] > 0
+            occ[i0:i1, j0:j1, za:zb] |= np.cumsum(diff, axis=2, dtype=np.int16)[:, :, :-1] > 0
     if si:
         k = np.floor((np.array(sz) - zl) / H).astype(int)
         ok = (k >= 0) & (k < nz)

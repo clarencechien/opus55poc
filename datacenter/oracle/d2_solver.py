@@ -606,10 +606,11 @@ def main():
     pathlib.Path(a.out).write_text(json.dumps(to_json(racks), indent=1))
     info = {"n_ref": n, "config": desc, "before_polish": cnt, "summary": summary(racks),
             "polished": [{"n": r[0], "before": r[1], "config": r[2]} for r in results],
-            "configs_tried": len(pool), "rule_checks": sv.n_checks}
+            "configs_tried": len(pool), "rule_checks": sv.n_checks,
+            "best_before_polish": [{"n": v[0], "config": k} for k, v in sorted(pool.items(), key=lambda kv: -kv[1][0])[:40]]}
     if a.log:
         pathlib.Path(a.log).write_text(json.dumps(info, indent=1))
-    print(json.dumps(info, indent=1))
+    print(json.dumps({k: v for k, v in info.items() if k != "best_before_polish"}, indent=1))
 
 
 if __name__ == "__main__":

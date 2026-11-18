@@ -15,6 +15,7 @@ import json
 import math
 import pathlib
 import random
+import re
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -215,6 +216,12 @@ def terminals(scene: dict) -> dict:
             "rules": scene["rules"]}
 
 
+def dumps(obj) -> str:
+    """Indented JSON with every list of numbers kept on one line."""
+    txt = json.dumps(obj, indent=1)
+    return re.sub(r"\[\s+(-?[\d.e+-]+(?:,\s+-?[\d.e+-]+)*)\s+\]", lambda m: "[" + re.sub(r"\s+", " ", m.group(1)) + "]", txt)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, required=True)
@@ -223,8 +230,8 @@ def main():
     sc = build(a.seed)
     out = pathlib.Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "scene.json").write_text(json.dumps(sc, indent=1))
-    (out / "terminals.json").write_text(json.dumps(terminals(sc), indent=1))
+    (out / "scene.json").write_text(dumps(sc))
+    (out / "terminals.json").write_text(dumps(terminals(sc)))
     print(f"seed {a.seed}: {len(sc['obstacles'])} obstacles, manifold on {sc['manifold']['wall']}, "
           f"targets {[t['rack'] for t in sc['targets']]} -> {out / 'scene.json'}")
 

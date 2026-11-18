@@ -250,7 +250,6 @@ def main():
         assert res is not None, f"{rid}: no single route exists"
         single[rid], lref[rid] = res[0], res[1]
         print(f"{rid}: L_ref {res[1]:.2f} m, {bends(res[0])} bends, by bend count {res[2]}  [{time.time() - t0:.0f}s]", flush=True)
-    chk = evaluate(scene, {}, lref)
     for rid in routes:      # each single route must be valid on its own
         d = evaluate(scene, {rid: single[rid]}, lref)["detail"]["routes"][rid]
         assert d["valid"] and abs(d["length"] - lref[rid]) < 1e-6, (rid, d)
@@ -286,7 +285,6 @@ def main():
                                                        "n_valid": sc["detail"]["n_valid"], "L_ref": lref, "naive": naive,
                                                        "bends": {i: bends(sol[i]) for i in ids}}, indent=1))
     print(json.dumps({"total": sc["total"], "n_valid": sc["detail"]["n_valid"], "order": order, "L_ref": lref, "naive": naive}))
-    del chk
 
 
 if __name__ == "__main__":

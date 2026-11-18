@@ -11,6 +11,7 @@ import os
 import sys
 
 import bpy
+import mathutils
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bench"))
 from render_common import do_render  # noqa: E402
@@ -66,20 +67,41 @@ print(do_render({"view": "top", "res": "1600x1200"}, path=os.path.join(out, "d3_
 show_all_but(["Ceiling", "Wall_S", "Wall_W"])
 print(do_render({"view": "iso", "res": "1600x1200"}, path=os.path.join(out, "d3_iso.png")))
 
-# close view along the manifold: camera 1.2 m in front of the wall, 3 m before the first port, just under the beams
+# close view along the manifold wall: try a few camera spots beside the manifold and keep the first one whose line of
+# sight to the ports is not blocked by an obstacle box
 show_all_but(["Ceiling"])
 ports = sorted((o for o in bpy.context.scene.objects if o.name.startswith("Port_")), key=lambda o: o.name)
 man = bpy.data.objects.get("Manifold")
 if ports and man:
-    a, b = ports[0].location, ports[-1].location
+    boxes = []
+    for o in bpy.context.scene.objects:
+        if o.type == "MESH" and o.name not in ("Manifold", "Ceiling"):
+            c = [o.matrix_world @ mathutils.Vector(v) for v in o.bound_box]
+            boxes.append(([min(v[i] for v in c) - 0.05 for i in range(3)], [max(v[i] for v in c) + 0.05 for i in range(3)]))
+
+    def clear(p, q):
+        for k in range(41):
+            x = p + (q - p) * (k / 40)
+            if any(all(lo[i] <= x[i] <= hi[i] for i in range(3)) for lo, hi in boxes):
+                return False
+        return True
+    a, b = ports[0].location.copy(), ports[-1].location.copy()
     along = (b - a).normalized()
-    inward = (a - man.location)
+    inward = a - man.location
     inward.z = 0
     inward -= along * inward.dot(along)
     inward.normalize()
-    cam = a - along * 3.0 + inward * 0.85
-    cam.z = 3.05
-    tgt = (a + b) / 2 - inward * 0.1
+    tgt = (a + b) / 2
     tgt.z = 2.9
+    best = None
+    for inn in (1.5, 1.0, 0.7):
+        for dist in (2.0, 2.5, 1.5, 3.0, 3.5, 4.5):
+            for z in (2.95, 2.75, 3.25):
+                for end, sgn in ((a, -1.0), (b, 1.0)):
+                    cam = end + along * sgn * dist + inward * inn
+                    cam.z = z
+                    if best is None and clear(cam, tgt) and clear(cam, a) and clear(cam, b):
+                        best = cam
+    cam = best or (a - along * 3.0 + inward * 0.7 + mathutils.Vector((0, 0, 0.05)))
     view = f"cam:{cam.x:.3f},{cam.y:.3f},{cam.z:.3f}>{tgt.x:.3f},{tgt.y:.3f},{tgt.z:.3f}"
-    print(do_render({"view": view, "res": "1600x1200", "lens": 22}, path=os.path.join(out, "d3_manifold.png")))
+    print(do_render({"view": view, "res": "1600x1200", "lens": 18}, path=os.path.join(out, "d3_manifold.png")))
