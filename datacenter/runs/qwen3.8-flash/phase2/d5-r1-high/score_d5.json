@@ -1,0 +1,171 @@
+{
+ "stage": "d5",
+ "total": 99.05,
+ "parts": {
+  "iou": 49.99,
+  "features": 49.06
+ },
+ "detail": {
+  "missing_root": false,
+  "objects": 29,
+  "triangles": 1196,
+  "triangle_limit": 100000,
+  "bbox_gt": {
+   "min": [
+    -0.59,
+    -0.68,
+    0.0
+   ],
+   "max": [
+    0.59,
+    0.68,
+    2.23
+   ],
+   "size": [
+    1.18,
+    1.36,
+    2.23
+   ]
+  },
+  "iou": 0.9998,
+  "iou_best_xy_shift": {
+   "iou": 0.9998,
+   "shift_mm": [
+    0,
+    0
+   ],
+   "note": "submission moved by this much (whole voxels, within +-50 mm) fits best"
+  },
+  "bbox_submission": {
+   "min": [
+    -0.59,
+    -0.68,
+    0.0
+   ],
+   "max": [
+    0.59,
+    0.68,
+    2.23
+   ],
+   "size": [
+    1.18,
+    1.36,
+    2.23
+   ]
+  },
+  "bbox_size_error_mm": [
+   -0.0,
+   -0.0,
+   0.0
+  ],
+  "bbox_centre_error_mm": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "voxels": {
+   "gt": 2243683,
+   "submission": 2243657,
+   "common": 2243485,
+   "missing": 198,
+   "surplus": 172,
+   "submission_outside_core_grid": 0
+  },
+  "features": {
+   "body": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "score": 1.0,
+    "gt_voxels": 2090000,
+    "sub_voxels_in_region": 2090000
+   },
+   "plinth": {
+    "recall": 1.0,
+    "precision": 0.9996,
+    "score": 0.9996,
+    "gt_voxels": 73440,
+    "sub_voxels_in_region": 73472
+   },
+   "feet": {
+    "recall": 1.0,
+    "precision": 0.8889,
+    "score": 0.8889,
+    "gt_voxels": 384,
+    "sub_voxels_in_region": 432
+   },
+   "door": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "score": 1.0,
+    "gt_voxels": 24012,
+    "sub_voxels_in_region": 24012
+   },
+   "display": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "score": 1.0,
+    "gt_voxels": 1176,
+    "sub_voxels_in_region": 1176
+   },
+   "handle": {
+    "recall": 1.0,
+    "precision": 0.9458,
+    "score": 0.9458,
+    "gt_voxels": 872,
+    "sub_voxels_in_region": 922
+   },
+   "control_box": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "score": 1.0,
+    "gt_voxels": 38055,
+    "sub_voxels_in_region": 38055
+   },
+   "top_pipes": {
+    "recall": 0.9924,
+    "precision": 1.0,
+    "score": 0.9924,
+    "gt_voxels": 4224,
+    "sub_voxels_in_region": 4192
+   },
+   "rear_manifold": {
+    "recall": 0.9671,
+    "precision": 0.9854,
+    "score": 0.953,
+    "gt_voxels": 5040,
+    "sub_voxels_in_region": 4946
+   },
+   "louvre": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "score": 1.0,
+    "gt_voxels": 2520,
+    "sub_voxels_in_region": 2520
+   },
+   "lifting_eyes": {
+    "recall": 1.0,
+    "precision": 0.9945,
+    "score": 0.9945,
+    "gt_voxels": 360,
+    "sub_voxels_in_region": 362
+   },
+   "gland_box": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "score": 1.0,
+    "gt_voxels": 3600,
+    "sub_voxels_in_region": 3600
+   }
+  },
+  "feature_mean": 0.9812,
+  "over_triangle_limit": false,
+  "raw_total_before_triangle_rule": 99.05,
+  "voxeliser": {
+   "shells_closed": 29,
+   "open_objects": 0,
+   "rays": 23793,
+   "unpaired_hits": 0
+  },
+  "seconds": 0.6
+ }
+}

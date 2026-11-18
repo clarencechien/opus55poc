@@ -9,6 +9,9 @@ def loadA(p):
     return a[::-1].copy()
 
 S = bpy.context.scene
+for nm in list(S.objects):
+    if nm.name.startswith("Tmp"):
+        bpy.data.objects.remove(nm, do_unlink=True)
 cam_data = bpy.data.cameras.new("TmpCam"); cam_data.type='ORTHO'
 cam = bpy.data.objects.new("TmpCam", cam_data); S.collection.objects.link(cam)
 S.camera = cam
@@ -28,6 +31,12 @@ VIEWS = {
  'right': dict(loc=(10,0,1.115), rot=(math.pi/2,0,math.pi/2), res=(880,1315), scale=2.63, bx=(100,780,100,1215), img='inputs/view_right.png'),
  'top':   dict(loc=(0,0,10), rot=(0,0,0), res=(790,880), scale=1.76, bx=(100,690,100,780), img='inputs/view_top.png'),
 }
+def dilate(a, it):
+    for _ in range(it):
+        b = a.copy()
+        b[1:,:] |= a[:-1]; b[:-1,:] |= a[1:]; b[:,1:] |= a[:,:-1]; b[:,:-1] |= a[:,1:]
+        a = b
+    return a
 for k,v in VIEWS.items():
     cam.location=v['loc']; cam.rotation_euler=v['rot']; cam_data.ortho_scale=v['scale']
     S.render.resolution_x, S.render.resolution_y = v['res']
@@ -40,11 +49,17 @@ for k,v in VIEWS.items():
     theirs = ~bg
     x0,x1,y0,y1=v['bx']
     m = mine[y0:y1+1, x0:x1+1]; t = theirs[y0:y1+1, x0:x1+1]
-    inter=(m&t).sum(); uni=(m|t).sum()
-    print("%-6s IoU=%.4f mine=%d theirs=%d  mine-only=%d theirs-only=%d"%(k,inter/uni,m.sum(),t.sum(),(m&~t).sum(),(t&~m).sum()))
-    ys,xs=np.nonzero(m&~t)
-    if len(xs): print("   mine-only px x %d..%d y %d..%d"%(xs.min()+x0,xs.max()+x0,ys.min()+y0,ys.max()+y0))
-    ys,xs=np.nonzero(t&~m)
-    if len(xs): print("   theirs-only px x %d..%d y %d..%d"%(xs.min()+x0,xs.max()+x0,ys.min()+y0,ys.max()+y0))
-    np.save('/tmp/m_%s.npy'%k, m); np.save('/tmp/t_%s.npy'%k, t)
+    md = dilate(m,3); td = dilate(t,3)
+    print("%-6s IoU=%.4f  mine-only(beyond 3px of drawing)=%d  drawing-only(beyond 3px of mine)=%d" % (
+        k, (m&t).sum()/(m|t).sum(), (m&~td).sum(), (t&~md).sum()))
+    ys,xs=np.nonzero(t&~md)
+    if len(xs):
+        print("     drawing-only px x %d..%d y %d..%d"%(xs.min()+x0,xs.max()+x0,ys.min()+y0,ys.max()+y0))
+    ys,xs=np.nonzero(m&~td)
+    if len(xs):
+        print("     mine-only px x %d..%d y %d..%d"%(xs.min()+x0,xs.max()+x0,ys.min()+y0,ys.max()+y0))
+for nm in list(S.objects):
+    if nm.name.startswith("Tmp"):
+        bpy.data.objects.remove(nm, do_unlink=True)
+S.camera = None
 print("done")

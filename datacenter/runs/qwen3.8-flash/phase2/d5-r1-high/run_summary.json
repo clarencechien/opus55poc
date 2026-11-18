@@ -1,0 +1,18 @@
+{
+ "model": "qwen/qwen3.8-flash",
+ "reasoning_effort": "high",
+ "kind": "end",
+ "reason": "submitted",
+ "turns": 84,
+ "cost_usd": 0.2689,
+ "peak_prompt_tokens": 233251,
+ "tokens": {
+  "prompt": 9904030,
+  "completion": 162378,
+  "cached": 9649152,
+  "reasoning": 130696
+ },
+ "seconds": 2276.2,
+ "bench_calls": 37,
+ "auto_submitted": false
+}

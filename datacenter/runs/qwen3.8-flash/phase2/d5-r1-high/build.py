@@ -34,8 +34,6 @@ def box(name, x0, x1, y0, y1, z0, z1):
     return link(name, me)
 
 def cyl(name, r, a, b, s0, s1, axis, seg=24):
-    """radius r; axis 'z': (a,b)=(x,y) centre, s = z range
-       axis 'x': (a,b)=(y,z) centre, s = x range ; axis 'y': (a,b)=(x,z), s = y range"""
     me = bpy.data.meshes.new(name); R = r*MM
     A = MM*a; B = MM*b; S0 = MM*s0; S1 = MM*s1
     vs = []
@@ -50,13 +48,10 @@ def cyl(name, r, a, b, s0, s1, axis, seg=24):
     elif axis == 'x': c0 = (S0, A, B); c1 = (S1, A, B)
     else:             c0 = (A, S0, B); c1 = (A, S1, B)
     vs += [c0, c1]
-    n = 2*seg
-    fs = []
+    n = 2*seg; fs = []
     for i in range(seg):
         j = (i+1) % seg
-        fs.append((j, i, n))                    # bottom cap
-        fs.append((seg+i, seg+j, n+1))          # top cap
-        fs.append((i, j, seg+j, seg+i))         # side
+        fs.append((j, i, n)); fs.append((seg+i, seg+j, n+1)); fs.append((i, j, seg+j, seg+i))
     me.from_pydata(vs, [], fs)
     return link(name, me)
 
@@ -82,10 +77,10 @@ for k,(a,b) in enumerate([(x,y) for x in [(-489,-433),(311,367)] for y in [(430,
 box("Door", -511, 179, -590, -565, 151, 1891)
 # ---- display
 box("Display", -353, -67, -621, -585, 1582, 1720)
-# ---- door handle
-cyl("HandleBar", 20, 109, -660, 901, 1321, 'z', 20)
-box("HandleMount1", 92, 127, -646, -585, 1324, 1358)
-box("HandleMount2", 92, 127, -646, -585, 864, 898)
+# ---- door handle (bar z 820..1402, dia 41, y -639..-681 ; mounts y -592..-660)
+cyl("HandleBar", 20.5, 109, -660, 820, 1402, 'z', 20)
+box("HandleMount1", 92, 127, -662, -585, 1322, 1360)
+box("HandleMount2", 92, 127, -662, -585, 862, 902)
 # ---- control box
 box("ControlBox", -321, -21, 341, 491, 2000, 2091)
 # ---- pipe stubs on top
@@ -94,11 +89,11 @@ cyl("PipeB", 50, -131,   71, 2000, 2230, 'z', 24)
 cyl("PipeC", 50,   79,  151, 2000, 2111, 'z', 24)
 cyl("PipeD", 40,  209, -399, 2000, 2111, 'z', 24)
 # ---- rear manifold with valves
-cyl("Manifold", 40, 618, 351, -460, 340, 'x', 24)
-cyl("Valve1", 62, 618, 351, -391, -329, 'x', 24)
-cyl("Valve2", 62, 618, 351, -171, -109, 'x', 24)
-cyl("Stub1", 20, -411, 351, 512, 622, 'y', 16)
-cyl("Stub2", 20,  289, 351, 512, 622, 'y', 16)
+cyl("Manifold", 40, 620, 351, -460, 340, 'x', 24)
+cyl("Valve1", 62, 620, 351, -391, -329, 'x', 24)
+cyl("Valve2", 62, 620, 351, -171, -109, 'x', 24)
+cyl("Stub1", 20, -411, 351, 512, 624, 'y', 16)
+cyl("Stub2", 20,  289, 351, 512, 624, 'y', 16)
 # ---- louvre
 for i,(z0,z1) in enumerate([(1011,1051),(1101,1141),(1191,1231),(1281,1321),(1371,1411)]):
     box("Louvre%d"%(i+1), -590, -550, -110, 311, z0, z1)
@@ -132,3 +127,10 @@ for o in parts:
             mn[i]=min(mn[i],w[i]); mx[i]=max(mx[i],w[i])
 print("parts:", len(parts), "tris:", tri)
 print("bbox mm:", [round(v*1000,1) for v in mn], [round(v*1000,1) for v in mx])
+vol = 0
+import numpy as np
+for o in parts:
+    bm = bmesh.new(); bm.from_mesh(o.data)
+    vol += bm.calc_volume(signed=True)
+    bm.free()
+print("sum part volume m3 (overlaps counted twice):", round(vol,3))
