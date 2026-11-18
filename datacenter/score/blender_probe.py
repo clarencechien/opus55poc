@@ -30,7 +30,16 @@ for o in bpy.context.scene.objects:
 for o in bpy.context.scene.objects:  # non-mesh objects (empties as roots) for the parent chain
     if o.type != "MESH":
         objs.append({"name": o.name, "type": o.type, "parent": o.parent.name if o.parent else None, "min": None, "max": None,
-                     "tris": 0, "props": {}, "verts": 0, "materials": []})
+                     "tris": 0, "verts": 0, "materials": [],
+                     "props": {k: (v if isinstance(v, (int, float, str, bool)) else str(v)) for k, v in o.items() if not k.startswith("_")},
+                     "instance": o.instance_collection.name if o.instance_type == "COLLECTION" and o.instance_collection else None})
+for e in objs:  # world transform of every object
+    ob = bpy.context.scene.objects.get(e["name"])
+    if ob:
+        mw = ob.matrix_world
+        e["loc"] = list(mw.translation)
+        f = mw.to_3x3() @ mathutils.Vector((0, -1, 0))  # template front direction
+        e["front"] = [f.x, f.y, f.z]
 hits = []
 for ox, oy, oz, dx, dy, dz, dist in q.get("rays", []):
     ok, loc, _n, _i, obj, _m = bpy.context.scene.ray_cast(dg, mathutils.Vector((ox, oy, oz)),
