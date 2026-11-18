@@ -145,7 +145,7 @@ class Runner:
 
     def go(self):
         sysmsg = (HERE / "prompts" / "system.md").read_text()
-        task = (HERE / "prompts" / f"{self.a.stage}.md").read_text()
+        task = (HERE / "prompts" / f"{self.a.prompt or self.a.stage}.md").read_text()
         messages = [{"role": "system", "content": sysmsg},
                     {"role": "user", "content": f"Your working directory (the run directory) is `{self.run}`.\n\n{task}"}]
         self.rec(kind="start", model=self.a.model, stage=self.a.stage, reasoning_effort=self.a.reasoning_effort)
@@ -215,6 +215,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", required=True)
     ap.add_argument("--stage", default="s1")
+    ap.add_argument("--prompt", help="prompt file name in prompts/ without .md (default: the stage name)")
     ap.add_argument("--model", default="qwen/qwen3.8-flash")
     ap.add_argument("--provider", default="Alibaba")
     ap.add_argument("--max-cost", type=float, default=1.5)

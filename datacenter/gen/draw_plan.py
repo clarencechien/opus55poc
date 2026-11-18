@@ -20,7 +20,13 @@ INK = (20, 20, 20)
 GRID = (120, 120, 120)
 DIM = (40, 40, 40)
 CANVAS_W = 2400
-ML, MR, MT, MB = 360, 330, 330, 560  # margins (px)
+ML, MR, MT, MB = 360, 330, 330, 560
+
+
+def margins(lay):
+    if lay.get("scenario", "easy") == "easy":
+        return 360, 330, 330, 560
+    return 420, 380, 400, 700  # margins (px)
 
 
 def font(sz, bold=False):
@@ -32,6 +38,8 @@ class Plan:
         self.lay = lay
         gx, gy = lay["grid"]["x"], lay["grid"]["y"]
         self.W, self.D = max(gx.values()), max(gy.values())
+        global ML, MR, MT, MB
+        ML, MR, MT, MB = margins(lay)
         self.s = (CANVAS_W - ML - MR) / self.W
         self.H = int(MT + MB + self.D * self.s)
         self.img = Image.new("RGB", (CANVAS_W, self.H), "white")
@@ -130,21 +138,46 @@ class Plan:
         h = t / 2
         # grid lines + bubbles (north and west sides)
         for k, x in gx.items():
-            self.dashed((self.X(x), self.Y(self.D) - 210), (self.X(x), self.Y(0) + 40))
-            bx, by = self.X(x), self.Y(self.D) - 240
+            off = 240 if lay.get("scenario", "easy") == "easy" else 290
+            self.dashed((self.X(x), self.Y(self.D) - off + 30), (self.X(x), self.Y(0) + 40))
+            bx, by = self.X(x), self.Y(self.D) - off
             d.ellipse([bx - 28, by - 28, bx + 28, by + 28], outline=INK, width=2, fill="white")
             self.text((bx, by), k, sz=26, bold=True)
         for k, y in gy.items():
-            self.dashed((self.X(0) - 210, self.Y(y)), (self.X(self.W) + 40, self.Y(y)))
-            bx, by = self.X(0) - 240, self.Y(y)
+            off = 240 if lay.get("scenario", "easy") == "easy" else 290
+            self.dashed((self.X(0) - off + 30, self.Y(y)), (self.X(self.W) + 40, self.Y(y)))
+            bx, by = self.X(0) - off, self.Y(y)
             d.ellipse([bx - 28, by - 28, bx + 28, by + 28], outline=INK, width=2, fill="white")
             self.text((bx, by), k, sz=26, bold=True)
-        # walls (outer face to inner face), hatched grey
+        # walls (outer face to inner face), grey; rooms white
         self.rect(-h, -h, self.W + h, self.D + h, fill=(95, 95, 95))
-        self.rect(h, h, self.W - h, self.D - h, fill="white")
+        if lay.get("scenario", "easy") == "easy":
+            self.rect(h, h, self.W - h, self.D - h, fill="white")
+        else:
+            self.d.polygon([(self.X(x), self.Y(y)) for x, y in lay["room"]["polygon"]], fill="white")
+            if lay.get("ups_room"):
+                up = lay["ups_room"]["polygon"]
+                self.d.polygon([(self.X(x), self.Y(y)) for x, y in up], fill=(236, 236, 236))
+                xs, ys = [p[0] for p in up], [p[1] for p in up]
+                for k in range(0, int((max(xs) - min(xs) + max(ys) - min(ys)) / 400)):
+                    a = min(xs) + k * 400
+                    pts = [(a, min(ys)), (a - (max(ys) - min(ys)), max(ys))]
+                    (x0, y0), (x1, y1) = pts
+                    # clip the hatch line to the room box
+                    if x1 < min(xs):
+                        y1 = y0 + (x0 - min(xs)); x1 = min(xs)
+                    if x0 > max(xs):
+                        y0 = y0 + (x0 - max(xs)); x0 = max(xs)
+                    if y0 < y1:
+                        self.d.line([(self.X(x0), self.Y(y0)), (self.X(x1), self.Y(y1))], fill=(205, 205, 205), width=1)
+                self.text((self.X((min(xs) + max(xs)) / 2), self.Y((min(ys) + max(ys)) / 2)), "UPS ROOM", sz=26, bold=True)
+                self.text((self.X((min(xs) + max(xs)) / 2), self.Y((min(ys) + max(ys)) / 2) + 32), "(NOT PART OF DATA HALL)", sz=16)
         for door in lay["doors"]:
             cx, cy = door["center"]
             w = door["width"]
+            if lay.get("scenario", "easy") != "easy":
+                self.door_generic(door, h)
+                continue
             if door["wall"] in "EW":
                 self.rect(cx - h - 2, cy - w / 2, cx + h + 2, cy + w / 2, fill="white")
                 sgn = -1 if door["wall"] == "E" else 1
@@ -165,8 +198,11 @@ class Plan:
         for c in lay["crah"]:
             self.equipment(c, 15, (215, 228, 240), cross=True)
         for r in lay["racks"]:
-            self.equipment(r, 17, (232, 232, 232))
-        self.dims()
+            self.equipment(r, 17, (200, 214, 200) if r["size"][0] != 600 else (232, 232, 232))
+        if lay.get("scenario", "easy") == "easy":
+            self.dims()
+        else:
+            self.dims_generic()
         self.notes()
         return self.img
 
@@ -201,6 +237,94 @@ class Plan:
         door = lay["doors"][0]
         self.vchain([gy["2"], door["center"][1], self.D], r0 + 55)
 
+    def door_generic(self, door, h):
+        d = self.d
+        cx, cy = door["center"]
+        w = door["width"]
+        wall = door["wall"]
+        into = {"S": (0, 1), "N": (0, -1), "E": (-1, 0), "W": (1, 0)}[wall]
+        if wall in "NS":
+            self.rect(cx - w / 2, cy - h - 2, cx + w / 2, cy + h + 2, fill="white")
+            leaves = [(cx - w / 2, +1), (cx + w / 2, -1)] if w >= 1500 else [(cx - w / 2, +1)]
+            lw = w / 2 if w >= 1500 else w
+            for hx, sgn in leaves:
+                hy = cy + into[1] * h
+                ex, ey = hx, hy + into[1] * lw
+                d.line([(self.X(hx), self.Y(hy)), (self.X(ex), self.Y(ey))], fill=INK, width=2)
+                r = lw * self.s
+                px, py = self.X(hx), self.Y(hy)
+                # quarter arc from the open leaf back to the wall
+                if into[1] > 0:
+                    a0, a1 = (270, 360) if sgn > 0 else (180, 270)
+                else:
+                    a0, a1 = (0, 90) if sgn > 0 else (90, 180)
+                d.arc([px - r, py - r, px + r, py + r], a0, a1, fill=INK, width=1)
+            self.text((self.X(cx), self.Y(cy) + (34 if into[1] < 0 else -34)), door["id"], sz=18, bold=True)
+        else:
+            self.rect(cx - h - 2, cy - w / 2, cx + h + 2, cy + w / 2, fill="white")
+            self.text((self.X(cx) + (60 if into[0] < 0 else -60), self.Y(cy)), door["id"], sz=18, bold=True)
+
+    def dims_generic(self):
+        lay = self.lay
+        gx, gy = lay["grid"]["x"], lay["grid"]["y"]
+        W, D = self.W, self.D
+        # grid chains and overall (top, left)
+        self.hchain(list(gx.values()), self.Y(D) - 150)
+        self.hchain([0, W], self.Y(D) - 200)
+        self.vchain(list(gy.values()), self.X(0) - 150)
+        self.vchain([0, D], self.X(0) - 200)
+        xrows = [r for r in lay["racks"] if r["facing"] in "NS"]
+        yrows = [r for r in lay["racks"] if r["facing"] in "EW"]
+        # x-running rows: one bottom chain per cold-aisle pair (all rack edges where width changes or a gap starts/ends)
+        groups = {}
+        for r in xrows:
+            key = next(i for i, a in enumerate(lay["aisles"]) if a["rect"][0] - 1 <= r["center"][0] <= a["rect"][2] + 1
+                       and abs((a["rect"][1] + a["rect"][3]) / 2 - r["center"][1]) < 2500)
+            groups.setdefault(key, []).append(r)
+        line = 0
+        for key in sorted(groups, key=lambda k: min(r["center"][0] for r in groups[k])):
+            edges = set()
+            for row in {r["row"] for r in groups[key]}:
+                rs = sorted((r for r in groups[key] if r["row"] == row), key=lambda r: r["center"][0])
+                prev = None
+                for r in rs:
+                    x0, x1 = r["center"][0] - r["size"][0] / 2, r["center"][0] + r["size"][0] / 2
+                    if prev is None or abs(prev[1] - x0) > 1 or prev[2] != r["size"][0]:
+                        edges.add(round(x0))
+                        if prev is not None:
+                            edges.add(round(prev[1]))
+                    prev = (x0, x1, r["size"][0])
+                edges.add(round(prev[1]))
+            self.hchain([0] + sorted(edges), self.Y(0) + 90 + 55 * line)
+            line += 1
+        for door in lay["doors"]:
+            if door["wall"] == "S":
+                self.hchain([0, door["center"][0]], self.Y(0) + 90 + 55 * line)
+                line += 1
+        # right: y edges of x-running rows; east CRAH centrelines on a second line
+        ys = sorted({round(r["center"][1] - r["size"][1] / 2) for r in xrows} | {round(r["center"][1] + r["size"][1] / 2) for r in xrows})
+        r0 = self.X(W) + 90
+        self.vchain([0] + ys + [gy["3"]], r0)
+        east = [c for c in lay["crah"] if c["facing"] == "W"]
+        if east:
+            self.vchain([0] + [c["center"][1] for c in east] + [gy["3"]], r0 + 55)
+        # left (inner lines): west CRAH centrelines; north-south rows' y extents
+        west = [c for c in lay["crah"] if c["facing"] == "E"]
+        if west:
+            self.vchain([0] + [c["center"][1] for c in west] + [D], self.X(0) - 55)
+        if yrows:
+            yv = sorted({round(r["center"][1] - r["size"][0] / 2) for r in yrows} | {round(r["center"][1] + r["size"][0] / 2) for r in yrows})
+            self.vchain([gy["3"], yv[0], yv[-1], D], self.X(0) - 100)
+            xv = sorted({round(r["center"][0] - r["size"][1] / 2) for r in yrows} | {round(r["center"][0] + r["size"][1] / 2) for r in yrows})
+            top_pts = [0] + xv
+        else:
+            top_pts = [0]
+        # top inner line: north-south rows' x edges and the door in the internal wall
+        for door in lay["doors"]:
+            if door["wall"] == "N":
+                top_pts += [gx["D"], door["center"][0], W]
+        self.hchain(sorted(set(top_pts)), self.Y(D) - 95)
+
     def notes(self):
         d = self.d
         x, y = 40, self.H - MB + 250
@@ -212,6 +336,8 @@ class Plan:
             "4. RACKS 600 W x 1200 D TYP.  CRAH UNITS 1800 W x 900 D.  RACKS IN A ROW ARE BUTTED TOGETHER.",
             "5. D1: 1800 DOUBLE DOOR.",
         ]
+        if self.lay.get("scenario", "easy") != "easy":
+            lines = lines[:4] + ["5. GPU RACKS (SHADED) 800 W x 1200 D.  D1: 1800 DOUBLE DOOR.  D2: 1200 SINGLE DOOR."]
         for i, s in enumerate(lines):
             self.text((x, y + 45 + i * 32), s, sz=19, anchor="lm")
         # legend

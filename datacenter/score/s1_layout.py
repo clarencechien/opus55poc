@@ -5,8 +5,8 @@
 
 Score out of 100:
   racks 50  (F1 20, position 15, facing 10, ids 5)   matched by Hungarian assignment, <= 300 mm
-  room 10   (inner polygon bbox 6, heights + wall thickness 4)
-  columns 5, crah 5, doors 5, aisles 10
+  room 10   (inner polygon: bbox 3 + polygon IoU 3, heights + wall thickness 4)
+  columns 5, crah 5, doors 5, aisles 10 (hard: cold aisles only)
   shell 15  (walls present 5, door openings 2, wall height 2, raised floor 3, columns 3)
 """
 from __future__ import annotations
@@ -88,8 +88,15 @@ def score_layout(gt, pred):
         corner_err = None
     hk = ("wall_thickness", "clear_height", "raised_floor_height")
     h_ok = sum(abs((proom.get(k) or 0) - groom[k]) <= 0.01 * groom[k] for k in hk) / len(hk)
-    det["room"] = {"bbox_max_err_mm": corner_err, "heights_ok": h_ok}
-    s_room = (6 * max(0.0, 1 - corner_err / 500) if corner_err is not None else 0) + 4 * h_ok
+    try:
+        from shapely.geometry import Polygon
+        pg, pp = Polygon(groom["polygon"]), Polygon(proom["polygon"])
+        piou = pg.intersection(pp).area / pg.union(pp).area if pp.is_valid else 0.0
+    except Exception:
+        piou = 0.0
+    det["room"] = {"bbox_max_err_mm": corner_err, "polygon_iou": round(piou, 4), "heights_ok": h_ok}
+    s_room = (3 * max(0.0, 1 - corner_err / 500) if corner_err is not None else 0) \
+        + 3 * max(0.0, (piou - 0.9) / 0.1) + 4 * h_ok
 
     # columns, crah, doors
     def simple(key, w, extra=None):
@@ -111,7 +118,8 @@ def score_layout(gt, pred):
     # aisles: best IoU per GT aisle with same type
     pa = pred.get("aisles") or []
     ious = []
-    for a in gt["aisles"]:
+    scored_aisles = gt["aisles"] if gt.get("scenario", "easy") == "easy" else [x for x in gt["aisles"] if x["type"] == "cold"]
+    for a in scored_aisles:
         cands = [iou(a["rect"], p["rect"]) for p in pa if p.get("type") == a["type"] and isinstance(p.get("rect"), list) and len(p["rect"]) == 4]
         ious.append(max(cands, default=0.0))
     det["aisles"] = {"iou_per_gt": [round(v, 3) for v in ious], "pred": len(pa)}
