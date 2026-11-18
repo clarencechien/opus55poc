@@ -244,8 +244,9 @@ def s2_submission_parts(label, run):
     return parts
 
 
-def s3_layout_parts():
-    return [{"type": "text", "text": "The layout (redrawn plan):"}, small_img(ROOT / "judge" / "assets" / "easy-s3_layout_plan.png", 1568)]
+def s3_layout_parts(scenario="easy"):
+    return [{"type": "text", "text": "The layout (redrawn plan):"},
+            small_img(ROOT / "judge" / "assets" / f"{scenario}-s3_layout_plan.png", 1568)]
 
 
 def s3_submission_parts(label, run):
@@ -306,7 +307,7 @@ def main():
               "drawing as 'ambiguous' rather than wrong.")
     result = {"model": a.model, "api": "Gemini API (direct)", "cost_note": "estimated from token counts", "absolute": {"X": [], "Y": []}, "pairwise": None, "cost_usd": 0.0}
     if a.stage == "s3":
-        head = [{"type": "text", "text": RUBRIC["s3"]}] + s3_layout_parts()
+        head = [{"type": "text", "text": RUBRIC["s3"]}] + s3_layout_parts(a.scenario)
         for label, run in (("X", order[0]), ("Y", order[1])):
             for k in range(a.repeats):
                 msgs = [{"role": "system", "content": sysmsg},
