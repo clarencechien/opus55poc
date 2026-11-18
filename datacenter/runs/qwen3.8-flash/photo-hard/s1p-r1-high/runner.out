@@ -1,0 +1,15 @@
+{
+ "kind": "end",
+ "reason": "submitted",
+ "turns": 134,
+ "cost_usd": 0.4291,
+ "tokens": {
+  "prompt": 18373588,
+  "completion": 197668,
+  "cached": 18058752,
+  "reasoning": 152126
+ },
+ "seconds": 3452.0,
+ "bench_calls": 45,
+ "auto_submitted": false
+}
