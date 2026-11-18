@@ -15,7 +15,7 @@
 | 計次的 bench 呼叫 | 31 | 15 |
 | 花費 | $0.137（496 萬 prompt token，其中 483 萬命中快取） | API $0（約 15 萬 token，計入 Claude 方案用量） |
 
-並排對照圖（每列：Rack A 正面、Rack A 近景、Rack B 等角、Rack B 近景）：`../judge/s2-easy/` 的原始紀錄，以及各 run 的 `review/`。
+並排對照圖（每列：Rack A 正面、Rack A 近景、Rack B 等角、Rack B 近景）：`../judge/s2-easy-qwen-default/` 的原始紀錄，以及各 run 的 `review/`。
 
 ## Gemini 的判斷和查證
 
