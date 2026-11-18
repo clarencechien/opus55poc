@@ -1,0 +1,218 @@
+{
+ "stage": "d1",
+ "total": 100.0,
+ "parts": {
+  "changes": 70.0,
+  "inventory": 30.0
+ },
+ "detail": {
+  "true_changes": 16,
+  "predicted_changes": 16,
+  "matched_changes": 16,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1": 1.0,
+  "items_as_built": 60,
+  "items_design": 62,
+  "items_predicted": 60,
+  "items_matched": 60,
+  "items_surplus": 0,
+  "invalid_pred_items": 0,
+  "found": [
+   {
+    "label": "gone",
+    "kind": "racks",
+    "center": [
+     14100,
+     1900
+    ],
+    "facing": "N",
+    "width": 600,
+    "nearest_design_id": "A03",
+    "nearest_design_dist_mm": 0
+   },
+   {
+    "label": "gone",
+    "kind": "racks",
+    "center": [
+     14700,
+     1900
+    ],
+    "facing": "N",
+    "width": 600,
+    "nearest_design_id": "A04",
+    "nearest_design_dist_mm": 0
+   },
+   {
+    "label": "gone",
+    "kind": "racks",
+    "center": [
+     15300,
+     1900
+    ],
+    "facing": "N",
+    "width": 600,
+    "nearest_design_id": "A05",
+    "nearest_design_dist_mm": 0
+   },
+   {
+    "label": "gone",
+    "kind": "racks",
+    "center": [
+     14600,
+     4300
+    ],
+    "facing": "S",
+    "width": 800,
+    "nearest_design_id": "B03",
+    "nearest_design_dist_mm": 0
+   },
+   {
+    "label": "gone",
+    "kind": "racks",
+    "center": [
+     3300,
+     6000
+    ],
+    "facing": "N",
+    "width": 600,
+    "nearest_design_id": "C01",
+    "nearest_design_dist_mm": 0
+   },
+   {
+    "label": "gone",
+    "kind": "racks",
+    "center": [
+     3900,
+     6000
+    ],
+    "facing": "N",
+    "width": 600,
+    "nearest_design_id": "C02",
+    "nearest_design_dist_mm": 0
+   },
+   {
+    "label": "gone",
+    "kind": "racks",
+    "center": [
+     3000,
+     13800
+    ],
+    "facing": "E",
+    "width": 600,
+    "nearest_design_id": "E01",
+    "nearest_design_dist_mm": 0
+   },
+   {
+    "label": "gone",
+    "kind": "racks",
+    "center": [
+     5400,
+     16200
+    ],
+    "facing": "W",
+    "width": 600,
+    "nearest_design_id": "F05",
+    "nearest_design_dist_mm": 0
+   },
+   {
+    "label": "gone",
+    "kind": "crah",
+    "center": [
+     550,
+     3000
+    ],
+    "facing": "E",
+    "width": 1800,
+    "nearest_design_id": "CRAH-1",
+    "nearest_design_dist_mm": 0
+   },
+   {
+    "label": "new",
+    "kind": "racks",
+    "center": [
+     14100,
+     1900
+    ],
+    "facing": "S",
+    "width": 600,
+    "nearest_design_id": "A03",
+    "nearest_design_dist_mm": 0
+   },
+   {
+    "label": "new",
+    "kind": "racks",
+    "center": [
+     14700,
+     1900
+    ],
+    "facing": "S",
+    "width": 600,
+    "nearest_design_id": "A04",
+    "nearest_design_dist_mm": 0
+   },
+   {
+    "label": "new",
+    "kind": "racks",
+    "center": [
+     15300,
+     1900
+    ],
+    "facing": "S",
+    "width": 600,
+    "nearest_design_id": "A05",
+    "nearest_design_dist_mm": 0
+   },
+   {
+    "label": "new",
+    "kind": "racks",
+    "center": [
+     3000,
+     16800
+    ],
+    "facing": "E",
+    "width": 600,
+    "nearest_design_id": "E05",
+    "nearest_design_dist_mm": 600
+   },
+   {
+    "label": "new",
+    "kind": "racks",
+    "center": [
+     5400,
+     16300
+    ],
+    "facing": "W",
+    "width": 800,
+    "nearest_design_id": "F05",
+    "nearest_design_dist_mm": 100
+   },
+   {
+    "label": "new",
+    "kind": "racks",
+    "center": [
+     11700,
+     8400
+    ],
+    "facing": "S",
+    "width": 600,
+    "nearest_design_id": "D14",
+    "nearest_design_dist_mm": 600
+   },
+   {
+    "label": "new",
+    "kind": "crah",
+    "center": [
+     550,
+     1200
+    ],
+    "facing": "E",
+    "width": 1800,
+    "nearest_design_id": "CRAH-1",
+    "nearest_design_dist_mm": 1800
+   }
+  ],
+  "missed": [],
+  "false_alarms": []
+ }
+}
