@@ -9,6 +9,7 @@ The terminals are empties Port_P1..P6 and Target_P1..P6. Nothing else is in the 
 import json
 import sys
 
+import bmesh
 import bpy
 
 args = sys.argv[sys.argv.index("--") + 1:]
@@ -50,6 +51,11 @@ def add_box(b):
              for i in (0, 1) for j in (0, 1) for k in (0, 1)]
     me = bpy.data.meshes.new(b["name"])
     me.from_pydata(verts, [], FACES)
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
     me.update()
     o = bpy.data.objects.new(b["name"], me)
     o.location = ctr
