@@ -1,0 +1,17 @@
+{
+ "kind": "end",
+ "reason": "submitted",
+ "turns": 77,
+ "cost_usd": 0.2588,
+ "peak_prompt_tokens": 240804,
+ "truncated_replies": 0,
+ "tokens": {
+  "prompt": 9476337,
+  "completion": 151277,
+  "cached": 9206784,
+  "reasoning": 111762
+ },
+ "seconds": 3685.3,
+ "bench_calls": 31,
+ "auto_submitted": false
+}

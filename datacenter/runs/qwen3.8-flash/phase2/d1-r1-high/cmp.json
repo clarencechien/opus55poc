@@ -1,4 +1,3 @@
 [
- {"a": "inputs/photo_6.jpg", "b": "renders/flat_6.png", "box": [400, 410, 560, 520], "scale": 5, "stack": true, "out": "cmp/p6_B03.png"},
- {"a": "inputs/photo_6.jpg", "b": "renders/tpl_B_6.png", "box": [640, 400, 900, 640], "scale": 3, "stack": true, "out": "cmp/p6_Aeast.png"}
+ {"a": "inputs/photo_1.jpg", "b": "renders/e_1.png", "box": [100, 380, 760, 700], "scale": 2, "stack": true, "out": "cmp/p1_cd2.png"}
 ]
