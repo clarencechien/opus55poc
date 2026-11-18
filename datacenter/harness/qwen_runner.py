@@ -121,6 +121,8 @@ class Runner:
     def call(self, messages):
         body = {"model": self.a.model, "messages": messages, "tools": TOOLS, "tool_choice": "auto",
                 "usage": {"include": True}, "max_tokens": 32000}
+        if self.a.reasoning_effort:
+            body["reasoning"] = {"effort": self.a.reasoning_effort}
         if self.a.provider:
             body["provider"] = {"order": [self.a.provider], "allow_fallbacks": False}
         for attempt in range(6):
@@ -146,7 +148,7 @@ class Runner:
         task = (HERE / "prompts" / f"{self.a.stage}.md").read_text()
         messages = [{"role": "system", "content": sysmsg},
                     {"role": "user", "content": f"Your working directory (the run directory) is `{self.run}`.\n\n{task}"}]
-        self.rec(kind="start", model=self.a.model, stage=self.a.stage)
+        self.rec(kind="start", model=self.a.model, stage=self.a.stage, reasoning_effort=self.a.reasoning_effort)
         end_reason = "max_turns"
         t0 = time.time()
         for turn in range(self.a.max_turns):
@@ -205,7 +207,7 @@ class Runner:
                    "tokens": self.tokens, "seconds": round(time.time() - t0, 1),
                    "bench_calls": self.bench_state()["used"], "auto_submitted": not st.get("submitted")}
         self.rec(**summary)
-        (self.run / "run_summary.json").write_text(json.dumps({"model": self.a.model, **summary}, indent=1))
+        (self.run / "run_summary.json").write_text(json.dumps({"model": self.a.model, "reasoning_effort": self.a.reasoning_effort or "provider default", **summary}, indent=1))
         print(json.dumps(summary, indent=1))
 
 
@@ -217,6 +219,8 @@ def main():
     ap.add_argument("--provider", default="Alibaba")
     ap.add_argument("--max-cost", type=float, default=1.5)
     ap.add_argument("--max-turns", type=int, default=150)
+    ap.add_argument("--reasoning-effort", choices=["low", "medium", "high"], default=None,
+                    help="OpenRouter reasoning effort; omitted = provider default (thinking stays on for Qwen 3.8)")
     Runner(ap.parse_args()).go()
 
 

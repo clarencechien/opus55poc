@@ -20,6 +20,11 @@ if "--isolate" in args:
     i = args.index("--isolate")
     iso_root = args[i + 1]
     del args[i:i + 2]
+names = None
+if "--names" in args:
+    i = args.index("--names")
+    names = args[i + 1].split(",")
+    del args[i:i + 2]
 views = args or ["top", "iso"]
 os.makedirs(out, exist_ok=True)
 
@@ -38,12 +43,13 @@ if iso_root:
         o.hide_render = hide
         o.hide_set(hide)
 prefix = f"{iso_root}_" if iso_root else ""
-for v in views:
+for idx, v in enumerate(views):
     view = v
+    label = names[idx] if names else v
     if v == "close":
         lo, hi = scene_bounds()
         ctr = (lo + hi) / 2
         tgt = mathutils.Vector((ctr.x, lo.y, lo.z + (hi.z - lo.z) * 0.55))
         cam = tgt + mathutils.Vector((-1.2, -2.3, 0.25))
         view = f"cam:{cam.x:.3f},{cam.y:.3f},{cam.z:.3f}>{tgt.x:.3f},{tgt.y:.3f},{tgt.z:.3f}"
-    print(do_render({"view": view, "res": "1024x768", "lens": 35 if v == "close" else 24}, path=os.path.join(out, f"review_{prefix}{v}.png")))
+    print(do_render({"view": view, "res": "1024x768", "lens": 35 if v == "close" else 24}, path=os.path.join(out, f"review_{prefix}{label}.png")))

@@ -49,6 +49,7 @@ def main():
     ap.add_argument("--run", required=True)
     ap.add_argument("--layout", required=True)
     ap.add_argument("--out")
+    ap.add_argument("--no-render", action="store_true")
     a = ap.parse_args()
     run = pathlib.Path(a.run)
     lay = json.loads(pathlib.Path(a.layout).read_text())
@@ -194,6 +195,15 @@ def main():
            "cable_trays": tray_scores, "objects": len(objs),
            "tris_total": sum(o["tris"] for o in objs)}
     res = {"stage": "s3", "total": round(total, 2), "parts": {k: round(v, 2) for k, v in parts.items()}, "detail": det}
+    if not a.no_render:
+        views = ["top", "iso"]
+        for k, (x0, y0, x1, y1) in enumerate(cold):
+            yc, xc = (y0 + y1) / 2, (x0 + x1) / 2
+            views.append(f"cam:{x0 + 0.4:.2f},{yc:.2f},1.75>{x1:.2f},{yc:.2f},1.35")      # inside the cold aisle
+            views.append(f"cam:{xc - 3.5:.2f},{y0 - 4.5:.2f},4.2>{xc:.2f},{yc:.2f},1.2")  # overview from the south-west
+        names = ["top", "iso"] + [n for k in range(len(cold)) for n in (f"coldaisle{k}", f"overview{k}")]
+        subprocess.run([BLENDER, "-b", str(blend), "--python", str(HERE / "render_views.py"), "--", str(run / "review"),
+                        "--names", ",".join(names), *views], capture_output=True, timeout=900)
     print(json.dumps(res, indent=1))
     if a.out:
         pathlib.Path(a.out).write_text(json.dumps(res, indent=1))

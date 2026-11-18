@@ -85,6 +85,43 @@ S2_PAIR_SCHEMA = {
 }
 
 
+S3_ITEMS = ["rack_count_matches_plan", "rack_positions_match_plan", "racks_face_cold_aisle", "racks_on_raised_floor",
+            "no_collisions_or_floating", "containment_roof", "containment_end_doors", "perforated_tiles_in_cold_aisle",
+            "cable_trays_over_rows", "overall_coherence"]
+RUBRIC["s3"] = """The task given to the modeller: in a prepared Blender room (walls, columns, a raised floor whose top is at 0.6 m),
+place a copy of a template closed rack cabinet (0.6 x 1.2 x 2.0 m) for every rack in the layout (first image: the layout
+redrawn as a plan; a triangle on the thick front edge marks each rack's front), standing on the raised floor, at the right
+position and facing the right way, so that the rack fronts face each other across the cold aisle. Then add cold-aisle
+containment (a roof over the cold aisle at rack-top height and a door panel at each open end), 600 mm perforated floor tiles
+in the cold aisle, and a 300 mm overhead cable tray above each rack row, 300 mm above the rack tops. Racks must not overlap
+each other, walls or columns. Template racks parked outside the room (west of it) are not part of the result.
+You get Workbench (flat-shaded) renders: top, isometric, a view from inside the cold aisle, and an overview.
+Judge each checklist item as present / partial / absent from the renders and the layout."""
+S3_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["checks", "summary"],
+    "properties": {
+        "checks": {"type": "array", "items": {
+            "type": "object", "additionalProperties": False, "required": ["item", "verdict", "note"],
+            "properties": {"item": {"type": "string", "enum": S3_ITEMS},
+                           "verdict": {"type": "string", "enum": ["present", "partial", "absent"]},
+                           "note": {"type": "string"}}}},
+        "summary": {"type": "string"},
+    },
+}
+S3_PAIR_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["better_placement", "better_aisle_fitout", "better_overall", "confidence", "reason"],
+    "properties": {k: {"type": "string", "enum": ["X", "Y", "tie"]} for k in ("better_placement", "better_aisle_fitout", "better_overall")}
+    | {"confidence": {"type": "string", "enum": ["low", "medium", "high"]}, "reason": {"type": "string"}},
+}
+
+
+def s3_score(g):
+    credit = {"present": 1.0, "partial": 0.5, "absent": 0.0}
+    v = {c["item"]: credit[c["verdict"]] for c in g["checks"] if c["item"] in S3_ITEMS}
+    return {"pct": round(100 * sum(v.get(i, 0.0) for i in S3_ITEMS) / len(S3_ITEMS), 1),
+            "missing_items": [i for i in S3_ITEMS if i not in v]}
+
+
 def s2_score(g):
     """60 points from the judge's own verdicts: rack A checklist 30, rack B checklist 20, likeness 10 (A 6, B 4)."""
     credit = {"present": 1.0, "partial": 0.5, "absent": 0.0}
@@ -207,6 +244,20 @@ def s2_submission_parts(label, run):
     return parts
 
 
+def s3_layout_parts():
+    return [{"type": "text", "text": "The layout (redrawn plan):"}, small_img(ROOT / "judge" / "assets" / "easy-s3_layout_plan.png", 1568)]
+
+
+def s3_submission_parts(label, run):
+    rv = run / "review"
+    parts = []
+    for v, cap in (("top", "top view"), ("iso", "isometric view"), ("coldaisle0", "inside the cold aisle"), ("overview0", "overview")):
+        f = rv / f"review_{v}.png"
+        if f.exists():
+            parts += [{"type": "text", "text": f"Submission {label}: {cap}"}, small_img(f)]
+    return parts or [{"type": "text", "text": f"Submission {label}: no renders"}]
+
+
 def call(model, messages, schema, name):
     key = os.environ["gemini_key"]
     system = messages[0]["content"]
@@ -254,7 +305,26 @@ def main():
               "answer from the inputs yourself, be strict and specific, and mark anything genuinely ambiguous in the "
               "drawing as 'ambiguous' rather than wrong.")
     result = {"model": a.model, "api": "Gemini API (direct)", "cost_note": "estimated from token counts", "absolute": {"X": [], "Y": []}, "pairwise": None, "cost_usd": 0.0}
-    if a.stage == "s2":
+    if a.stage == "s3":
+        head = [{"type": "text", "text": RUBRIC["s3"]}] + s3_layout_parts()
+        for label, run in (("X", order[0]), ("Y", order[1])):
+            for k in range(a.repeats):
+                msgs = [{"role": "system", "content": sysmsg},
+                        {"role": "user", "content": head + s3_submission_parts(label, run)
+                         + [{"type": "text", "text": "Grade this submission: one check for every checklist item."}]}]
+                g, u = call(a.model, msgs, S3_SCHEMA, "grade")
+                result["cost_usd"] += float(u.get("cost") or 0)
+                g["derived"] = s3_score(g)
+                result["absolute"][label].append(g)
+                print(label, k, g["derived"], flush=True)
+        msgs = [{"role": "system", "content": sysmsg},
+                {"role": "user", "content": head + s3_submission_parts("X", order[0]) + s3_submission_parts("Y", order[1])
+                 + [{"type": "text", "text": "Compare submissions X and Y: which places the racks better, which fits out the aisle better, and overall?"}]}]
+        p, u = call(a.model, msgs, S3_PAIR_SCHEMA, "pairwise")
+        result["cost_usd"] += float(u.get("cost") or 0)
+        result["pairwise"] = p
+        print("pairwise", p, flush=True)
+    elif a.stage == "s2":
         head = [{"type": "text", "text": RUBRIC["s2"]}] + s2_reference_parts()
         for label, run in (("X", order[0]), ("Y", order[1])):
             for k in range(a.repeats):
