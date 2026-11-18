@@ -41,5 +41,29 @@ def check_s1(run: pathlib.Path) -> list[str]:
     return probs
 
 
-def check_submission(stage: str, run: pathlib.Path) -> list[str]:
-    return {"s1": check_s1}.get(stage, lambda r: [])(run)
+def check_s2(run: pathlib.Path, scene) -> list[str]:
+    if scene is None:
+        return []
+    names = {o["name"] for o in scene}
+    parent = {o["name"]: o["parent"] for o in scene}
+
+    def under(n, root):
+        while n:
+            if n == root:
+                return True
+            n = parent.get(n)
+        return False
+    probs = [f"missing object {n}" for n in ("RackA", "RackA_FrontDoor", "RackA_RearDoor", "RackB",
+                                             "RackB_Post_1", "RackB_Post_2", "RackB_Post_3", "RackB_Post_4") if n not in names]
+    stray = [o["name"] for o in scene if o["type"] == "MESH" and not under(o["name"], "RackA") and not under(o["name"], "RackB")]
+    if stray:
+        probs.append(f"{len(stray)} mesh objects are not parented under RackA or RackB, e.g. {stray[:5]}")
+    return probs
+
+
+def check_submission(stage: str, run: pathlib.Path, scene=None) -> list[str]:
+    if stage == "s1":
+        return check_s1(run)
+    if stage == "s2":
+        return check_s2(run, scene)
+    return []

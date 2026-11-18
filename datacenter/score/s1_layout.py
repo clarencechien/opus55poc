@@ -162,7 +162,7 @@ def score_shell(run, gt):
         if not o.exists():
             return 0.0, {"error": "probe failed"}
         res = json.loads(o.read_text())
-    objs, hits = res["objects"], res["hits"]
+    objs, hits = [o for o in res["objects"] if o["min"] is not None], res["hits"]
     wall_hits = [h for h, k in zip(hits, kinds) if k == "wall"]
     walls_ok = sum(1 for h in wall_hits if h and h.startswith("Wall")) / max(len(wall_hits), 1)
     door_hits = [h for h, k in zip(hits, kinds) if k == "door"]

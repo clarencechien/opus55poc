@@ -165,7 +165,12 @@ def main(argv: list[str]) -> None:
             out({"ok": False, "error": f"usage: bench submit {st['stage']}"}, 1)
         sys.path.insert(0, str(HERE))
         from stages import check_submission  # noqa: E402
-        problems = check_submission(st["stage"], RUN)
+        try:
+            ensure_server()
+            scene = rpc({"cmd": "inspect", "limit": 100000}, 60).get("objects", [])
+        except Exception:
+            scene = None
+        problems = check_submission(st["stage"], RUN, scene)
         if problems and not st.get("submit_warned"):
             st["submit_warned"] = True
             save_state(st)
@@ -174,7 +179,10 @@ def main(argv: list[str]) -> None:
                  "problems": problems}, 1)
         try:
             ensure_server()
-            rpc({"cmd": "save", "path": str(RUN / f"{st['stage']}.blend")}, 120)
+            req = {"cmd": "save", "path": str(RUN / f"{st['stage']}.blend")}
+            if st["stage"] != "s1":
+                req["glb"] = str(RUN / f"{st['stage']}.glb")
+            rpc(req, 300)
         except Exception as e:
             problems = (problems or []) + [f"could not save blend: {e}"]
         st["submitted"] = True
