@@ -1,0 +1,68 @@
+{
+ "stage": "s1",
+ "total": 97.11,
+ "parts": {
+  "racks": 50.0,
+  "room": 10.0,
+  "columns": 5.0,
+  "crah": 5.0,
+  "doors": 5.0,
+  "aisles": 7.11,
+  "shell": 15.0
+ },
+ "detail": {
+  "racks": {
+   "gt": 16,
+   "pred": 16,
+   "matched": 16,
+   "f1": 1.0,
+   "rmse_mm": 0.0,
+   "facing_acc": 1.0,
+   "id_acc": 1.0,
+   "size_acc": 1.0
+  },
+  "room": {
+   "bbox_max_err_mm": 0.0,
+   "heights_ok": 1.0
+  },
+  "columns": {
+   "gt": 2,
+   "pred": 2,
+   "matched": 2,
+   "f1": 1.0,
+   "mean_err_mm": 0.0
+  },
+  "crah": {
+   "gt": 2,
+   "pred": 2,
+   "matched": 2,
+   "f1": 1.0,
+   "mean_err_mm": 0.0,
+   "attr_acc": 1.0
+  },
+  "doors": {
+   "gt": 1,
+   "pred": 1,
+   "matched": 1,
+   "f1": 1.0,
+   "mean_err_mm": 0.0,
+   "attr_acc": 1.0
+  },
+  "aisles": {
+   "iou_per_gt": [
+    1.0,
+    1.0,
+    0.132
+   ],
+   "pred": 3
+  },
+  "shell": {
+   "walls_hit_rate": 1.0,
+   "door_open_rate": 1.0,
+   "wall_height_ok": 1.0,
+   "raised_floor": 1.0,
+   "columns_ok": 1.0,
+   "n_objects": 8
+  }
+ }
+}
