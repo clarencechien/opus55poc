@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Reference design for stage D2: fill an empty data hall with as many rule-conforming racks as possible.
 
-    python d2_solver.py --room room.json --out layout_design.json [--budget 600] [--seed 0] [--log search.json]
+    python d2_solver.py --room room.json --out layout_design.json [--cuts y=4300,x=14500] [--lns 1500] [--seed 0] [--log search.json]
 
 The result passes every rule of score/d2_design.py (it is checked with the same code) and its rack count is the
-N_REF that defines 100 % for the stage. Keep the output out of the repo.
+N_REF that defines 100 % for the stage. Keep the output out of the repo. Deterministic for a given room, options and
+--seed (no time limits inside). The full search takes about an hour on one core; --cuts limits stage B to the given
+split lines (their neighbours are still refined), which takes about 20 minutes.
 
 Method
   1. Row bands. For a rectangular zone and a row direction (rows along x = racks face N/S, rows along y = racks face
@@ -431,15 +433,13 @@ class Solver:
         return self.drop_bad(racks)[0]          # safety net: the result is always rule-clean
 
     # ------------------------------------------------------------------ large-neighbourhood search
-    def lns(self, racks, seconds, tag=""):
+    def lns(self, racks, windows, tag=""):
         """Repeatedly clear a random window, refill it with the row-band DP (random direction / spine / packing,
         the racks outside the window acting as obstacles) and re-insert; keep the result if it is not worse.
         Windows that contain GPU racks are skipped, so the GPU count is preserved."""
-        t0 = time.time()
         x0, y0, x1, y1 = self.bounds
-        best, it, wins = racks, 0, 0
-        while time.time() - t0 < seconds:
-            it += 1
+        best, wins = racks, 0
+        for it in range(1, int(windows) + 1):
             hi = 19200 if self.rng.random() < 0.25 else 9000
             w, h = self.rng.choice(range(2400, hi + 1, 600)), self.rng.choice(range(2400, hi + 1, 600))
             wx = self.rng.choice(np.arange(x0 - w / 2, x1 - w / 2, 300))
@@ -470,7 +470,7 @@ class Solver:
                 self.log(f"      lns{tag} it {it}: {len(best)} -> {len(trial)}")
             if len(trial) >= len(best):
                 best = trial
-        self.log(f"      lns{tag}: {it} windows, {wins} improvements, {len(racks)} -> {len(best)}")
+        self.log(f"      lns{tag}: {int(windows)} windows, {wins} improvements, {len(racks)} -> {len(best)}")
         return best
 
     # ------------------------------------------------------------------ GPU racks
@@ -554,8 +554,6 @@ class Solver:
                             break
                         loss = len(racks) - len(new)
                         options.append((loss / k, loss, -k, self.rng.random(), new))
-                        if loss > 0 and k >= 3:
-                            pass
             if not options:
                 return None
             options.sort(key=lambda o: o[:4])
@@ -564,17 +562,17 @@ class Solver:
         return racks
 
     # ------------------------------------------------------------------ search
-    def polish(self, racks, lns_s=0.0):
+    def polish(self, racks, lns_n=0):
         racks = self.repair(racks)
         racks = self.insert(racks)
-        if lns_s > 0:
-            racks = self.lns(racks, lns_s * 0.6, " (before GPU)")
+        if lns_n > 0:
+            racks = self.lns(racks, lns_n * 0.6, " (before GPU)")
         g = self.add_gpus(racks)
         if g is None:
             return None
         g = self.insert(g)
-        if lns_s > 0:
-            g = self.lns(g, lns_s * 0.4, " (after GPU)")
+        if lns_n > 0:
+            g = self.lns(g, lns_n * 0.4, " (after GPU)")
         return g
 
     def zone_pair(self, kind, c):
@@ -583,7 +581,7 @@ class Solver:
             return (x0, y0, c, y1), (c, y0, x1, y1)
         return (x0, y0, x1, c), (x0, c, x1, y1)
 
-    def search(self, budget_s=600.0, coarse=600, cut_step=600, top=12, lns_top=3, lns_s=240.0, cuts=None, refine=3, three=1):
+    def search(self, coarse=600, cut_step=600, top=10, lns_top=4, lns_n=1500, cuts=None, refine=3, three=1):
         t0 = time.time()
         x0, y0, x1, y1 = self.bounds
         whole = (x0, y0, x1, y1)
@@ -646,9 +644,6 @@ class Solver:
             self.rng.shuffle(rest)
             cuts += [c for c in rest if c not in cuts]
         for kind, c in cuts:
-            if time.time() - t0 > budget_s:
-                self.log("search budget used up")
-                break
             explore_cut(kind, c, coarse)
         # C. refine around the best split lines: neighbouring positions in 100 mm steps, finer spine positions
         for kind, c in sorted(cut_best, key=lambda k: -cut_best[k])[:refine]:
@@ -705,9 +700,9 @@ class Solver:
             self.log(f"[{time.time() - t0:6.1f}s] polish: {cnt} -> {len(final)}  {d}")
         results.sort(key=lambda r: -r[0])
         # large-neighbourhood search from the best few
-        for k in range(min(lns_top, len(results)) if lns_s > 0 else 0):
+        for k in range(min(lns_top, len(results)) if lns_n > 0 else 0):
             n, cnt, d, _, parts = results[k]
-            final = self.polish(self.build(parts), lns_s)
+            final = self.polish(self.build(parts), lns_n)
             if final is not None and len(final) > n:
                 results[k] = (len(final), cnt, d + " + LNS", final, parts)
             self.log(f"[{time.time() - t0:6.1f}s] LNS: {n} -> {len(final) if final is not None else None}  {d}")
@@ -743,21 +738,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--room", required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--budget", type=float, default=600, help="seconds for the zone-split search")
-    ap.add_argument("--top", type=int, default=12, help="candidates to polish")
+    ap.add_argument("--top", type=int, default=10, help="candidates to polish")
     ap.add_argument("--cut-step", type=int, default=600, help="spacing of the zone split lines tried (mm)")
     ap.add_argument("--cuts", help="only these split lines, e.g. 'y=4300,x=14500' (default: all, --cut-step apart)")
     ap.add_argument("--refine", type=int, default=3, help="number of best split lines refined in 100 mm steps")
     ap.add_argument("--three", type=int, default=1, help="number of best two-zone splits extended to three zones")
-    ap.add_argument("--lns-top", type=int, default=3, help="how many polished candidates get the large-neighbourhood search")
-    ap.add_argument("--lns", type=float, default=240, help="seconds of large-neighbourhood search per candidate")
+    ap.add_argument("--lns-top", type=int, default=4, help="how many polished candidates get the large-neighbourhood search")
+    ap.add_argument("--lns", type=int, default=1500, help="windows of large-neighbourhood search per candidate (0 = none)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--log", help="write the search summary (JSON) here")
     a = ap.parse_args()
     room_json = json.loads(pathlib.Path(a.room).read_text())
     sv = Solver(room_json, seed=a.seed)
     cuts = [(c.split("=")[0], float(c.split("=")[1])) for c in a.cuts.split(",")] if a.cuts else None
-    results, pool = sv.search(budget_s=a.budget, top=a.top, cut_step=a.cut_step, lns_top=a.lns_top, lns_s=a.lns, cuts=cuts, refine=a.refine, three=a.three)
+    results, pool = sv.search(top=a.top, cut_step=a.cut_step, lns_top=a.lns_top, lns_n=a.lns, cuts=cuts, refine=a.refine, three=a.three)
     n, cnt, desc, racks, _ = results[0]
     V = sv.check(racks)
     assert not V.any(), "reference design violates a rule"

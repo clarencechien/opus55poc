@@ -1,5 +1,4 @@
 [
- {"a": "inputs/photo_6.jpg", "b": "renders/flat_6.png", "box": [400, 370, 850, 480], "scale": 3, "stack": true, "out": "cmp/p6_bstrips.png"},
- {"a": "inputs/photo_2.jpg", "b": "renders/flat_2.png", "box": [380, 400, 900, 620], "scale": 2, "stack": true, "out": "cmp/p2_ab.png"},
- {"a": "inputs/photo_1.jpg", "b": "renders/flat_1.png", "box": [100, 400, 560, 660], "scale": 2, "stack": true, "out": "cmp/p1_cd.png"}
+ {"a": "inputs/photo_6.jpg", "b": "renders/flat_6.png", "box": [400, 410, 560, 520], "scale": 5, "stack": true, "out": "cmp/p6_B03.png"},
+ {"a": "inputs/photo_6.jpg", "b": "renders/tpl_B_6.png", "box": [640, 400, 900, 640], "scale": 3, "stack": true, "out": "cmp/p6_Aeast.png"}
 ]

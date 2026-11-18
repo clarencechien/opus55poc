@@ -1,0 +1,8 @@
+{"jobs": [
+ {"rows": ["A"], "cams": [6]},
+ {"rows": ["B"], "cams": [6]},
+ {"rows": ["C"], "cams": [1]},
+ {"rows": ["D"], "cams": [1]},
+ {"rows": ["E"], "cams": [3]},
+ {"rows": ["F"], "cams": [3]}
+]}
