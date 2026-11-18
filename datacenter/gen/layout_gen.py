@@ -68,7 +68,7 @@ def easy(rng: random.Random) -> dict:
     aisles = [
         {"type": "cold", "rect": [x_start, y_s_front, x_start + n * RACK_W, y_n_front]},
         {"type": "hot", "rect": [x_start, inner[1], x_start + n * RACK_W, y_s_back]},
-        {"type": "hot", "rect": [x_start, y_n_back, x_start + n * RACK_W, gy["2"] - COL / 2]},
+        {"type": "hot", "rect": [x_start, y_n_back, x_start + n * RACK_W, inner[3]]},  # open to the north wall
     ]
     # door on the east wall, north bay, double leaf
     door = {"id": "D1", "center": [W, round((gy["2"] + D) / 2 / 100) * 100], "width": 1800, "wall": "E"}
