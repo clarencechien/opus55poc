@@ -1,0 +1,134 @@
+{
+ "stage": "s3",
+ "total": 100.0,
+ "parts": {
+  "position": 25.0,
+  "facing": 20.0,
+  "height": 5.0,
+  "ids": 5.0,
+  "collisions": 10.0,
+  "containment": 15.0,
+  "perf_tiles": 10.0,
+  "cable_trays": 10.0
+ },
+ "detail": {
+  "racks_found": 16,
+  "racks_expected": 16,
+  "extra_rackIds": [],
+  "per_rack": {
+   "A01": {
+    "err_mm": 1.0,
+    "facing": "N",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "B01": {
+    "err_mm": 1.0,
+    "facing": "S",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "A02": {
+    "err_mm": 1.0,
+    "facing": "N",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "B02": {
+    "err_mm": 1.0,
+    "facing": "S",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "A03": {
+    "err_mm": 1.0,
+    "facing": "N",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "B03": {
+    "err_mm": 1.0,
+    "facing": "S",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "A04": {
+    "err_mm": 1.0,
+    "facing": "N",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "B04": {
+    "err_mm": 1.0,
+    "facing": "S",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "A05": {
+    "err_mm": 1.0,
+    "facing": "N",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "B05": {
+    "err_mm": 1.0,
+    "facing": "S",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "A06": {
+    "err_mm": 1.0,
+    "facing": "N",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "B06": {
+    "err_mm": 1.0,
+    "facing": "S",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "A07": {
+    "err_mm": 1.0,
+    "facing": "N",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "B07": {
+    "err_mm": 1.0,
+    "facing": "S",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "A08": {
+    "err_mm": 1.0,
+    "facing": "N",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   },
+   "B08": {
+    "err_mm": 1.0,
+    "facing": "S",
+    "facing_dev_deg": 0.0,
+    "bottom_z": 0.6
+   }
+  },
+  "collisions": 0,
+  "containment": {
+   "roof_hit_rate": 1.0,
+   "end_hit_rate": 1.0,
+   "roof_height_ok": 1.0
+  },
+  "perf_tiles": {
+   "cells": 16,
+   "covered": 16,
+   "tile_objects": 16
+  },
+  "cable_trays": {
+   "A": 1.0,
+   "B": 1.0
+  },
+  "objects": 117,
+  "tris_total": 31968
+ }
+}
