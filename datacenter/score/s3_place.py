@@ -112,15 +112,22 @@ def main():
             cx, cy, bz = o["loc"]
         err = math.dist((cx, cy), (r["center"][0] * mm, r["center"][1] * mm))
         fdir, fang = facing_of(o["front"])
-        pos_c.append(1.0 if err <= 0.01 else max(0.0, 1 - (err - 0.01) / 0.29))
+        w_exp, d_exp = r["size"][0] * mm, r["size"][1] * mm
+        if r["facing"] in "EW":
+            w_exp, d_exp = d_exp, w_exp
+        size_ok = True
+        if ms:
+            size_ok = abs((hi[0] - lo[0]) - w_exp) <= 0.05 and abs((hi[1] - lo[1]) - d_exp) <= 0.05
+        pos_c.append((1.0 if err <= 0.01 else max(0.0, 1 - (err - 0.01) / 0.29)) * (1.0 if size_ok else 0.5))
         face_c.append(1.0 if fdir == r["facing"] and fang <= 2 else 0.0)
         z_c.append(1.0 if abs(bz - FLOOR) <= 0.01 else max(0.0, 1 - (abs(bz - FLOOR) - 0.01) / 0.09))
         id_c += o["name"] == f"Rack_{r['id']}"
-        w, d = 0.6, 1.2
+        w, d = r["size"][0] * mm, r["size"][1] * mm
         if fdir in "EW":
             w, d = d, w
         foot[r["id"]] = [cx - w / 2, cy - d / 2, cx + w / 2, cy + d / 2]
-        det_r[r["id"]] = {"err_mm": round(err * 1000, 1), "facing": fdir, "facing_dev_deg": round(fang, 1), "bottom_z": round(bz, 3)}
+        det_r[r["id"]] = {"err_mm": round(err * 1000, 1), "facing": fdir, "facing_dev_deg": round(fang, 1),
+                          "bottom_z": round(bz, 3), "size_ok": size_ok}
     n = len(lay["racks"])
     extra = sorted(set(roots) - {r["id"] for r in lay["racks"]})
     # ---- collisions (racks vs racks, columns, room) ----
@@ -165,15 +172,17 @@ def main():
     trays = [o for o in objs if o["name"].startswith("CableTray") and o["min"] is not None]
     tray_scores = {}
     for row, rs in rows.items():
-        xs0 = min((r["center"][0] - r["size"][0] / 2) * mm for r in rs)
-        xs1 = max((r["center"][0] + r["size"][0] / 2) * mm for r in rs)
-        yc = sum(r["center"][1] for r in rs) / len(rs) * mm
+        ax = 0 if rs[0]["facing"] in "NS" else 1  # axis the row runs along
+        xs0 = min((r["center"][ax] - r["size"][0] / 2) * mm for r in rs)
+        xs1 = max((r["center"][ax] + r["size"][0] / 2) * mm for r in rs)
+        yc = sum(r["center"][1 - ax] for r in rs) / len(rs) * mm
         want_z = FLOOR + RACK_H + 0.3
-        good = [t for t in trays if t["min"][1] <= yc <= t["max"][1] and abs(t["min"][2] - want_z) <= 0.05
-                and abs((t["min"][1] + t["max"][1]) / 2 - yc) <= 0.05 and abs((t["max"][1] - t["min"][1]) - 0.3) <= 0.05]
+        o_ = 1 - ax
+        good = [t for t in trays if t["min"][o_] <= yc <= t["max"][o_] and abs(t["min"][2] - want_z) <= 0.05
+                and abs((t["min"][o_] + t["max"][o_]) / 2 - yc) <= 0.05 and abs((t["max"][o_] - t["min"][o_]) - 0.3) <= 0.05]
         cov = 0.0
         if good:
-            segs = sorted((max(t["min"][0], xs0), min(t["max"][0], xs1)) for t in good)
+            segs = sorted((max(t["min"][ax], xs0), min(t["max"][ax], xs1)) for t in good)
             cur, tot = xs0, 0.0
             for s0, s1 in segs:
                 s0 = max(s0, cur)

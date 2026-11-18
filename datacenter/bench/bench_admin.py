@@ -26,6 +26,7 @@ def main():
     ap.add_argument("--budget", type=int, default=60)
     ap.add_argument("--minutes", type=int, default=45)
     ap.add_argument("--start")
+    ap.add_argument("--inputs", help="input folder to copy (default: inputs/<scenario>)")
     a = ap.parse_args()
     if a.action == "stop":
         run = pathlib.Path((pathlib.Path.home() / ".bench_current").read_text().strip())
@@ -40,7 +41,7 @@ def main():
     if run.exists() and any(run.iterdir()):
         raise SystemExit(f"{run} is not empty")
     (run / ".bench").mkdir(parents=True)
-    src = ROOT / "inputs" / a.scenario
+    src = pathlib.Path(a.inputs) if a.inputs else ROOT / "inputs" / a.scenario
     shutil.copytree(src, run / "inputs")
     if a.stage in ("s2", "s3", "s4") or True:
         ref = ROOT / "ref"
