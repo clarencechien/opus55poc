@@ -4,6 +4,8 @@
 
 第一階段的結論和雲端版的成績在 `report/phase1.html`。
 
+> **更新：完整的 10 關（第一＋第二階段）重現套件已整理到 <https://github.com/clarencechien/qwenpoc>**，含一鍵執行、答案卷重建與雜湊驗證、計分彙整，以及給 Codex／Claude Code 的 `AGENTS.md`。請優先使用該 repo；這份手冊只涵蓋第一階段。完整報告在 `report/full_report.html`。
+
 ## 1. 你需要準備的
 
 | 項目 | 需求 |
