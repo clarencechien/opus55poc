@@ -32,6 +32,7 @@ import time
 
 import numpy as np
 import shapely
+from scipy import ndimage
 from shapely.geometry import box
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "score"))
@@ -166,10 +167,13 @@ class Solver:
         return keep
 
     # ------------------------------------------------------------------ row bands
-    def fill_zone(self, zone, axis, keepouts=(), existing=None, align="lo", strict=False):
+    def fill_zone(self, zone, axis, keepouts=(), existing=None, align="lo", strict=0, spine_q=None):
         """Best parallel rows in `zone` (x0, y0, x1, y1). Returns racks (n, 4) = cx, cy, w, facing index.
-        strict: no row may have a column inside its front or rear clearance band (columns end up inside rows,
-        so they do not cut the aisles)."""
+        strict = 1: no row may have a column inside its front or rear clearance band (columns end up inside rows,
+        so they never cut an aisle).
+        strict = 2: a column or CRAH unit that narrows the row's aisle below 900 cuts that aisle; the row then gets
+        a 900 gap right behind the obstacle, seen from the zone's spine at `spine_q`, so that the far part of the cut
+        aisle can be reached through the row's other aisle."""
         fr = self.frames[axis]
         z = zone if axis == 0 else (zone[1], zone[0], zone[3], zone[2])
         zu0, zv0, zu1, zv1 = max(z[0], fr.u0), max(z[1], fr.v0), min(z[2], fr.u1), min(z[3], fr.v1)
@@ -182,7 +186,8 @@ class Solver:
             return np.zeros((0, 4))
         cnt = np.zeros((n, 2), dtype=int)
         ivs = {}
-        cols = self.room.columns if axis == 0 else swap(self.room.columns)
+        cols = (self.room.columns if strict == 1 else self.room.fixed)
+        cols = cols if axis == 0 else swap(cols)
         cols = cols[(np.minimum(cols[:, 2], zu1) - np.maximum(cols[:, 0], zu0)) > D.EPS]
         for i, v0 in enumerate(vs):
             km = (np.minimum(K[:, 3], v0 + DEPTH) - np.maximum(K[:, 1], v0)) > D.EPS
@@ -190,15 +195,24 @@ class Solver:
             for s, sign in enumerate((1, -1)):
                 fi = SIGN_FACING[(axis, sign)]
                 forb = fr.static_forbid(float(v0), sign) + kf + obst.forbid(fr, v0, sign, fi)
-                free = [(a, b) for a, b in merge_free(forb, zu0, zu1) if b - a >= W0 - 1e-6]
-                ivs[(i, s)] = free
-                cnt[i, s] = sum(int((b - a + 1e-6) // W0) for a, b in free)
+                hard = False
                 if strict and len(cols):
                     vlo, vhi = fr.band(v0, sign)
-                    hit = ((np.minimum(cols[:, 3], v0) - np.maximum(cols[:, 1], vlo)) > D.EPS) | \
-                          ((np.minimum(cols[:, 3], vhi) - np.maximum(cols[:, 1], v0 + DEPTH)) > D.EPS)
-                    if hit.any():
-                        cnt[i, s] = -10 ** 6
+                    below = np.minimum(cols[:, 3], v0) - np.maximum(cols[:, 1], vlo)          # intrusion into the band below
+                    above = np.minimum(cols[:, 3], vhi) - np.maximum(cols[:, 1], v0 + DEPTH)  # ... and above the row
+                    if strict == 1:
+                        hard = bool(((below > D.EPS) | (above > D.EPS)).any())
+                    elif spine_q is not None:
+                        rear, front = (below, above) if sign > 0 else (above, below)
+                        cut = (rear > D.REAR_CLR - 2 * D.HALF_PATH + D.EPS) | (front > D.FRONT_CLR - 2 * D.HALF_PATH + D.EPS)
+                        for c in cols[cut]:
+                            if c[0] >= spine_q + SPINE - D.EPS:
+                                forb = forb + [(c[2], c[2] + SPINE)]
+                            elif c[2] <= spine_q + D.EPS:
+                                forb = forb + [(c[0] - SPINE, c[0])]
+                free = [(a, b) for a, b in merge_free(forb, zu0, zu1) if b - a >= W0 - 1e-6]
+                ivs[(i, s)] = free
+                cnt[i, s] = -10 ** 6 if hard else sum(int((b - a + 1e-6) // W0) for a, b in free)
         # DP over row positions; state = (index of the row's lower edge, sign)
         off = {(0, 1): math.ceil((DEPTH + D.FRONT_CLR) / STEP), (1, 0): math.ceil((DEPTH + D.REAR_CLR) / STEP),
                (0, 0): math.ceil((DEPTH + D.CORRIDOR) / STEP), (1, 1): math.ceil((DEPTH + D.CORRIDOR) / STEP)}
@@ -261,7 +275,7 @@ class Solver:
         racks = np.zeros((0, 4))
         keep = [self.spine_rect(p[0], p[1], p[2]) for p in parts if p[2] is not None]
         for zone, axis, q, align, strict in parts:
-            new = self.fill_zone(zone, axis, keepouts=keep, existing=racks, align=align, strict=strict)
+            new = self.fill_zone(zone, axis, keepouts=keep, existing=racks, align=align, strict=strict, spine_q=q)
             racks = np.vstack([racks, new])
         return self.drop_bad(racks)[0]
 
@@ -319,7 +333,9 @@ class Solver:
         return S[j1, i1] - S[j0, i1] - S[j1, i0] + S[j0, i0]
 
     def candidates(self, racks):
-        """Lattice positions (cx, cy, 600, f) that pass R1-R7 against the fixed items and the given racks."""
+        """Lattice positions (cx, cy, 600, f) that pass R1-R7 against the fixed items and the given racks.
+        Returns (corner, other): `corner` positions are at an end of their run of feasible positions in both x
+        and y (a rack pushed against something on two sides); they are tried first."""
         static = self._static_candidates()
         f = racks[:, 3].astype(int)
         F = D.footprints(racks[:, 0], racks[:, 1], racks[:, 2], f)
@@ -327,7 +343,7 @@ class Solver:
         occ_all = sum(occ)
         clr = self._integral(self._raster(np.vstack([D.extend(F, f, D.FRONT_CLR), D.extend(F, D.OPP[f], D.REAR_CLR)])))
         corr = [self._integral(self._raster(D.extend(F[f == g], f[f == g], D.CORRIDOR))) for g in range(4)]
-        out = []
+        corner, other = [], []
         for fi in range(4):
             jj, ii = np.where(static[fi])
             if len(ii) == 0:
@@ -337,46 +353,119 @@ class Solver:
             Fc = D.footprints(cx, cy, np.full(len(cx), float(W0)), ff)
             bad = self._boxsum(occ_all, Fc) + self._boxsum(clr, Fc)
             bad += self._boxsum(occ_all, D.extend(Fc, ff, D.FRONT_CLR)) + self._boxsum(occ_all, D.extend(Fc, D.OPP[ff], D.REAR_CLR))
-            opp = D.OPP[fi]
-            bad += self._boxsum(occ_all - occ[opp], D.extend(Fc, ff, D.CORRIDOR))
+            bad += self._boxsum(occ_all - occ[D.OPP[fi]], D.extend(Fc, ff, D.CORRIDOR))
             # existing corridors may only be entered by racks facing opposite to the corridor's owner
             for g in range(4):
                 if D.OPP[g] != fi:
                     bad += self._boxsum(corr[g], Fc)
             m = bad == 0
-            out.append(np.stack([cx[m], cy[m], np.full(m.sum(), float(W0)), np.full(m.sum(), float(fi))], axis=1))
-        return np.vstack(out) if out else np.zeros((0, 4))
+            M = np.zeros((static[fi].shape[0] + 2, static[fi].shape[1] + 2), dtype=bool)
+            M[jj[m] + 1, ii[m] + 1] = True
+            C = M[1:-1, 1:-1]
+            cor = C & ~(M[1:-1, :-2] & M[1:-1, 2:]) & ~(M[:-2, 1:-1] & M[2:, 1:-1])
+            for mask, dst in ((cor, corner), (C & ~cor, other)):
+                j2, i2 = np.where(mask)
+                dst.append(np.stack([self.lx[i2], self.ly[j2], np.full(len(i2), float(W0)), np.full(len(i2), float(fi))], axis=1))
+        return (np.vstack(corner) if corner else np.zeros((0, 4))), (np.vstack(other) if other else np.zeros((0, 4)))
 
-    def insert(self, racks, max_checks=4000):
-        """Greedy insertion of 600-wide racks until no lattice position fits."""
+    def insert(self, racks):
+        """Greedy insertion of 600-wide racks until no lattice position fits. candidates() guarantees R1-R7; the
+        access rule is tested here with one flood fill per trial. Racks are only added, so a failed position stays
+        failed and is never tried twice."""
+        room = self.room
         dead = set()
-        checks = 0
-        while checks < max_checks:
-            cand = self.candidates(racks)
-            cand = [c for c in cand if tuple(c) not in dead]
-            if not cand:
+        while True:
+            corner, other = self.candidates(racks)
+            if len(corner) + len(other) == 0:
                 break
-            # prefer positions that continue an existing row (same facing, same row line, touching)
             f = racks[:, 3].astype(int)
+            F = D.footprints(racks[:, 0], racks[:, 1], racks[:, 2], f)
+            blocked = room.static_blocked.copy()
+            for r in F:
+                room._block(blocked, r)
+            if room.start_idx is None or blocked[room.start_idx]:
+                break
+            lab, _ = ndimage.label(~blocked)
+            reached = lab == lab[room.start_idx]
+            P = np.vstack([racks[:, :2] + D.DIRS[f] * (DEPTH / 2 + D.FRONT_PT), racks[:, :2] - D.DIRS[f] * (DEPTH / 2 + D.REAR_PT)])
+            # prefer positions that continue an existing row (same facing, same row line, touching)
             keys = set()
             for r in racks:
-                ns = r[3] < 2
                 for sgn in (-1, 1):
-                    keys.add((r[0] + sgn * (r[2] / 2 + W0 / 2), r[1], r[3]) if ns else (r[0], r[1] + sgn * (r[2] / 2 + W0 / 2), r[3]))
-            cand.sort(key=lambda c: (0 if (c[0], c[1], c[3]) in keys else 1, self.rng.random()))
+                    keys.add((r[0] + sgn * (r[2] / 2 + W0 / 2), r[1], r[3]) if r[3] < 2 else (r[0], r[1] + sgn * (r[2] / 2 + W0 / 2), r[3]))
+            cand = []
+            for group, cap in ((corner, None), (other, 200)):
+                if len(group) == 0:
+                    continue
+                cf = group[:, 3].astype(int)
+                pf = group[:, :2] + D.DIRS[cf] * (DEPTH / 2 + D.FRONT_PT)
+                pr = group[:, :2] - D.DIRS[cf] * (DEPTH / 2 + D.REAR_PT)
+                group = group[room.near_reached(reached, pf) & room.near_reached(reached, pr)]
+                group = [c for c in group if tuple(c) not in dead]
+                group.sort(key=lambda c: (0 if (c[0], c[1], c[3]) in keys else 1, self.rng.random()))
+                cand += group[:cap] if cap else group
+            if not cand:
+                break
             added = False
             for c in cand:
-                trial = np.vstack([racks, c[None, :]])
-                checks += 1
-                if not self.check(trial).any():
-                    racks, added = trial, True
+                b2 = blocked.copy()
+                room._block(b2, D.footprints(c[0:1], c[1:2], c[2:3], c[3:4].astype(int))[0])
+                ok = not b2[room.start_idx]
+                if ok:
+                    lab, _ = ndimage.label(~b2)
+                    r2 = lab == lab[room.start_idx]
+                    d = D.DIRS[int(c[3])]
+                    pts = np.vstack([P, c[None, :2] + d * (DEPTH / 2 + D.FRONT_PT), c[None, :2] - d * (DEPTH / 2 + D.REAR_PT)])
+                    ok = bool(room.near_reached(r2, pts).all())
+                if ok:
+                    racks, added = np.vstack([racks, c[None, :]]), True
                     break
                 dead.add(tuple(c))
-                if checks >= max_checks:
-                    break
             if not added:
                 break
-        return racks
+        return self.drop_bad(racks)[0]          # safety net: the result is always rule-clean
+
+    # ------------------------------------------------------------------ large-neighbourhood search
+    def lns(self, racks, seconds, tag=""):
+        """Repeatedly clear a random window, refill it with the row-band DP (random direction / spine / packing,
+        the racks outside the window acting as obstacles) and re-insert; keep the result if it is not worse.
+        Windows that contain GPU racks are skipped, so the GPU count is preserved."""
+        t0 = time.time()
+        x0, y0, x1, y1 = self.bounds
+        best, it, wins = racks, 0, 0
+        while time.time() - t0 < seconds:
+            it += 1
+            w, h = self.rng.choice(range(2400, 12001, 600)), self.rng.choice(range(2400, 12001, 600))
+            wx = self.rng.choice(np.arange(x0 - w / 2, x1 - w / 2, 300))
+            wy = self.rng.choice(np.arange(y0 - h / 2, y1 - h / 2, 300))
+            win = (max(x0, wx), max(y0, wy), min(x1, wx + w), min(y1, wy + h))
+            f = best[:, 3].astype(int)
+            F = D.footprints(best[:, 0], best[:, 1], best[:, 2], f)
+            inside = D.overlap(F, np.array([win]))[:, 0]
+            if not inside.any() and self.rng.random() < 0.7:
+                continue
+            if (best[inside, 2] == D.GPU_W).any():
+                continue
+            keepers = best[~inside]
+            axis = self.rng.choice((0, 1))
+            keep = []
+            if self.rng.random() < 0.5:
+                lo, hi = (win[0], win[2]) if axis == 0 else (win[1], win[3])
+                if hi - lo > SPINE + W0:
+                    keep = [self.spine_rect(win, axis, self.rng.choice(np.arange(lo, hi - SPINE + 1, 300)))]
+            new = self.fill_zone(win, axis, keepouts=keep, existing=keepers, align=self.rng.choice(("lo", "hi", "mid")),
+                                 strict=self.rng.choice((0, 0, 1)))
+            trial = self.drop_bad(np.vstack([keepers, new]))[0]
+            if len(trial) + 6 < len(best):
+                continue
+            trial = self.insert(trial)
+            if len(trial) > len(best):
+                wins += 1
+                self.log(f"      lns{tag} it {it}: {len(best)} -> {len(trial)}")
+            if len(trial) >= len(best):
+                best = trial
+        self.log(f"      lns{tag}: {it} windows, {wins} improvements, {len(racks)} -> {len(best)}")
+        return best
 
     # ------------------------------------------------------------------ GPU racks
     def runs(self, racks):
@@ -469,13 +558,17 @@ class Solver:
         return racks
 
     # ------------------------------------------------------------------ search
-    def polish(self, racks):
+    def polish(self, racks, lns_s=0.0):
         racks = self.repair(racks)
         racks = self.insert(racks)
+        if lns_s > 0:
+            racks = self.lns(racks, lns_s * 0.6, " (before GPU)")
         g = self.add_gpus(racks)
         if g is None:
             return None
         g = self.insert(g)
+        if lns_s > 0:
+            g = self.lns(g, lns_s * 0.4, " (after GPU)")
         return g
 
     def zone_pair(self, kind, c):
@@ -484,7 +577,7 @@ class Solver:
             return (x0, y0, c, y1), (c, y0, x1, y1)
         return (x0, y0, x1, c), (x0, c, x1, y1)
 
-    def search(self, budget_s=600.0, coarse=600, cut_step=600, top=12):
+    def search(self, budget_s=600.0, coarse=600, cut_step=600, top=12, lns_top=3, lns_s=240.0):
         t0 = time.time()
         x0, y0, x1, y1 = self.bounds
         whole = (x0, y0, x1, y1)
@@ -492,7 +585,7 @@ class Solver:
 
         def desc_of(parts):
             return " + ".join(f"[{'x' if p[1] == 0 else 'y'}-rows in ({p[0][0]:.0f},{p[0][1]:.0f})-({p[0][2]:.0f},{p[0][3]:.0f}) "
-                              f"spine={'none' if p[2] is None else format(p[2], '.0f')} pack={p[3]}{' strict' if p[4] else ''}]"
+                              f"spine={'none' if p[2] is None else format(p[2], '.0f')} pack={p[3]}{('', ' columns-in-rows', ' bypass-gaps')[p[4]]}]"
                               for p in parts)
 
         def consider(parts):
@@ -508,8 +601,9 @@ class Solver:
         for axis in (0, 1):
             for q in self.spine_positions(whole, axis, 300):
                 for align in ("lo", "hi"):
-                    for strict in (False, True):
-                        consider([(whole, axis, q, align, strict)])
+                    for strict in (0, 1, 2):
+                        if strict < 2 or q is not None:
+                            consider([(whole, axis, q, align, strict)])
         self.log(f"[{time.time() - t0:6.1f}s] whole hall, one direction: best {best()}")
         # B. two zones split by a line; rank each zone's (axis, spine, strict) alone, then combine the best few
         pts = self.room.json["room"]["polygon"]
@@ -528,9 +622,10 @@ class Solver:
                 sel = []
                 for axis in (0, 1):
                     opts = []
-                    for strict in (False, True):
+                    for strict in (0, 1, 2):
                         for q in self.spine_positions(zone, axis, coarse):
-                            opts.append((len(self.build([(zone, axis, q, "lo", strict)])), q, strict))
+                            if strict < 2 or q is not None:
+                                opts.append((len(self.build([(zone, axis, q, "lo", strict)])), q, strict))
                     opts.sort(key=lambda o: -o[0])
                     none = [o for o in opts if o[1] is None][:1]
                     sel += [(axis, o[1], o[2]) for o in none + [o for o in opts if o[1] is not None][:2]]
@@ -556,8 +651,16 @@ class Solver:
             final = self.polish(racks)
             if final is None:
                 continue
-            results.append((len(final), cnt, d, final))
+            results.append((len(final), cnt, d, final, parts))
             self.log(f"[{time.time() - t0:6.1f}s] polish: {cnt} -> {len(final)}  {d}")
+        results.sort(key=lambda r: -r[0])
+        # large-neighbourhood search from the best few
+        for k in range(min(lns_top, len(results)) if lns_s > 0 else 0):
+            n, cnt, d, _, parts = results[k]
+            final = self.polish(self.build(parts), lns_s)
+            if final is not None and len(final) > n:
+                results[k] = (len(final), cnt, d + " + LNS", final, parts)
+            self.log(f"[{time.time() - t0:6.1f}s] LNS: {n} -> {len(final) if final is not None else None}  {d}")
         results.sort(key=lambda r: -r[0])
         return results, pool
 
@@ -593,13 +696,15 @@ def main():
     ap.add_argument("--budget", type=float, default=600, help="seconds for the zone-split search")
     ap.add_argument("--top", type=int, default=12, help="candidates to polish")
     ap.add_argument("--cut-step", type=int, default=600, help="spacing of the zone split lines tried (mm)")
+    ap.add_argument("--lns-top", type=int, default=3, help="how many polished candidates get the large-neighbourhood search")
+    ap.add_argument("--lns", type=float, default=240, help="seconds of large-neighbourhood search per candidate")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--log", help="write the search summary (JSON) here")
     a = ap.parse_args()
     room_json = json.loads(pathlib.Path(a.room).read_text())
     sv = Solver(room_json, seed=a.seed)
-    results, pool = sv.search(budget_s=a.budget, top=a.top, cut_step=a.cut_step)
-    n, cnt, desc, racks = results[0]
+    results, pool = sv.search(budget_s=a.budget, top=a.top, cut_step=a.cut_step, lns_top=a.lns_top, lns_s=a.lns)
+    n, cnt, desc, racks, _ = results[0]
     V = sv.check(racks)
     assert not V.any(), "reference design violates a rule"
     assert (racks[:, 2] == D.GPU_W).sum() == D.GPU_REQUIRED
