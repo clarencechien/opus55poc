@@ -32,7 +32,11 @@ TIMEOUTS = {"exec": 180, "render": 180, "inspect": 60, "save": 120}
 
 
 def run_dir() -> pathlib.Path:
-    p = os.environ.get("BENCH_RUN") or (pathlib.Path.home() / ".bench_current").read_text().strip()
+    p = os.environ.get("BENCH_RUN")
+    if not p and (pathlib.Path.cwd() / ".bench" / "state.json").exists():
+        p = str(pathlib.Path.cwd())  # run from inside a run directory: use it (lets several runs go in parallel)
+    if not p:
+        p = (pathlib.Path.home() / ".bench_current").read_text().strip()
     return pathlib.Path(p).resolve()
 
 
