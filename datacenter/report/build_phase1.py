@@ -129,6 +129,26 @@ qcost = sum(t[5]["cost"] or 0 for t in data)
 s1p_o = json.loads((RUNS / STAGES[5][1] / "score_s1p.json").read_text())["detail"]
 s1p_q = json.loads((RUNS / STAGES[5][2] / "score_s1p.json").read_text())["detail"]
 
+# ---- scoring model for the recommendation (weights were set AFTER seeing the results; stated in the report) ----
+WEIGHTS = [5, 10, 10, 5, 10, 30]          # correctness points per stage, sum 70
+PASS = 0.8                                # a stage passes at >= 80% of its maximum
+corr = {"o": 0.0, "q": 0.0}
+eff = {"o": [], "q": []}
+gate_rows = []
+for (title, so, sq, mx, to, tq), w in zip(data, WEIGHTS):
+    corr["o"] += w * so / mx
+    corr["q"] += w * sq / mx
+    fastest = min(to["sec"], tq["sec"])
+    eff["o"].append(fastest / to["sec"])
+    eff["q"].append(fastest / tq["sec"])
+    po, pq = so / mx >= PASS, sq / mx >= PASS
+    gate_rows.append(f"""<tr><td>{E(title)}</td><td class="num">{w}</td>
+      <td class="num"><b>{w * so / mx:.1f}</b> <span class="pf {'p' if po else 'f'}">{'通過' if po else '不通過'}</span></td>
+      <td class="num"><b>{w * sq / mx:.1f}</b> <span class="pf {'p' if pq else 'f'}">{'通過' if pq else '不通過'}</span></td></tr>""")
+eff_o, eff_q = 30 * sum(eff["o"]) / 6, 30 * sum(eff["q"]) / 6
+tot_o, tot_q = corr["o"] + eff_o, corr["q"] + eff_q
+print(f"weighted: opus {tot_o:.1f} (corr {corr['o']:.1f} + eff {eff_o:.1f}); qwen {tot_q:.1f} (corr {corr['q']:.1f} + eff {eff_q:.1f})")
+
 IMG = {
     "s2_opus": sheet("opus-5.5/easy/s2-r1", [(440, 330), (960, 200), (1680, 250), (1390, 130)]),
     "s2_qh": sheet("qwen3.8-flash/easy/s2-r2-high", [(130, 240), (540, 20), (928, 28), (1000, 320), (1390, 250), (1390, 50)]),
@@ -224,29 +244,30 @@ ul.err{font-size:12.5px;color:var(--mut);margin-top:4px}
 b.bad{color:var(--bad)}
 .note{font-size:13.5px;color:var(--mut)}
 .big-num{font:700 30px/1.1 ui-monospace,Menlo,monospace}
+.pf{font-size:12px;font-weight:700;border-radius:999px;padding:1px 9px;color:var(--card)}.pf.p{background:var(--ok)}.pf.f{background:var(--bad)}
 """
 
 BODY = f"""
 <main>
 <header style="display:flex;flex-direction:column;gap:12px">
   <span class="eyebrow">AI 機房 3D pipeline 驗證 · 第一階段報告 · 2026-11-18</span>
-  <h1>地端的 Qwen 3.8 Flash 夠用嗎，還是一定要用 Opus？</h1>
-  <p class="lead">我們讓兩個模型各自操作 Blender，完成同一條機房建模流程的 6 個關卡，用同一套工具、同樣的時間和次數上限，再用程式自動計分。</p>
+  <h1>這條機房建模流程不建議用地端的 Qwen 3.8 Flash-Next，應使用 Opus</h1>
+  <p class="lead">我們讓 Opus 5.5 和 Qwen 3.8 Flash 各自操作 Blender，完成同一條機房建模流程的 6 個關卡，用同一套工具、同樣的時間和次數上限，再用程式自動計分。</p>
 </header>
 
 <section>
   <div class="verdict">
-    <span class="eyebrow">第一階段的答案</span>
-    <div class="big">「必須用 Opus」只有一部分成立：要從照片判斷空間時需要 Opus；照著圖面和資料建模時，Qwen 也做得對，只是慢很多。</div>
-    <p>另外要注意：這次測的是雲端託管的 Qwen 3.8 Flash，不是地端的 Flash-Next。地端的限制還沒有實測，只能列出風險。</p>
+    <span class="eyebrow">結論與建議</span>
+    <div class="big">Qwen 3.8 Flash 在條件最好的雲端託管版就已經過不了「看照片推回佈局」這一關（53 分，Opus 96 分），整條流程的加權總分是 {tot_q:.0f} 對 {tot_o:.0f}。地端的 Flash-Next 條件只會更差，因此建議這條流程使用 Opus。</div>
+    <p>這次實測的是雲端託管版，不是地端版本。「地端只會更差」是依據下方第 6 節的三項事實所做的推論，建議用附帶的重現手冊在地端實測一次確認。</p>
   </div>
   <div class="three">
-    <div class="card"><span class="tag yes">成立</span><h3>看照片推回佈局：Opus 96 分，Qwen 53 分</h3>
-      <p>Qwen 把 6 列機櫃中的 2 列整排放錯位置，3 台空調只對 1 台。這是唯一拉開差距的關卡。</p></div>
-    <div class="card"><span class="tag no">不成立</span><h3>照圖面建模、擺放機櫃：兩邊都滿分</h3>
-      <p>連 58 櫃、L 形機房的困難版，Qwen 也做到每櫃誤差 0 mm。在這類工作上不能說一定要 Opus。</p></div>
-    <div class="card"><span class="tag unk">還不能回答</span><h3>地端 Flash-Next 的實際表現</h3>
-      <p>沒有實測。已知風險：上下文長度、量化、工具呼叫穩定度、硬體需求（見下方第 5 節）。每個關卡也只跑了 1 次。</p></div>
+    <div class="card"><span class="tag no">關鍵關卡不通過</span><h3>看照片推回佈局：Qwen 53 分，Opus 96 分</h3>
+      <p>Qwen 把 6 列機櫃中的 2 列整排放錯位置，4 台空調只有 1 台位置對。流程是一關接一關的，這一關錯了，後面的 3D 場景就跟著錯。</p></div>
+    <div class="card"><span class="tag no">速度</span><h3>每一關都比 Opus 慢 2–15 倍</h3>
+      <p>照圖面建模和擺放機櫃，Qwen 分數和 Opus 相同，但用時和操作次數都多很多。照片關卡用了 58 分鐘，上限是 60 分鐘。</p></div>
+    <div class="card"><span class="tag no">地端條件更差</span><h3>照片關卡的對話長度已超過地端原生上限</h3>
+      <p>Qwen 在這一關用到 {peak:,} token，Flash-Next 地端原生上限是 262,144。再加上量化和硬體限制，地端表現預期低於這次的數字。</p></div>
   </div>
 </section>
 
@@ -257,13 +278,31 @@ BODY = f"""
   <div class="tbl"><table><thead><tr><th>關卡</th><th>Opus 分數</th><th>Qwen 分數</th><th>Opus 用時</th><th>Qwen 用時</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>
   <ul>
     <li>Qwen 每個關卡都比 Opus 慢 2–15 倍，操作 Blender 的次數也多 1.5–8 倍。時間幾乎都花在等模型回應。</li>
-    <li>S2 的 40 分只檢查外框尺寸、擺放位置、命名和面數，<b>不評外觀</b>。外觀的缺失見第 3 節。</li>
+    <li>S2 的 40 分只檢查外框尺寸、擺放位置、命名和面數，<b>不評外觀</b>。外觀的缺失見第 4 節。</li>
     <li>Qwen 6 個關卡的 API 費用合計約 ${qcost:.2f}；Opus 用的是 Claude 方案額度。</li>
   </ul>
 </section>
 
 <section>
-  <span class="eyebrow">2 · 拉開差距的關卡</span>
+  <span class="eyebrow">2 · 配分與判定方式</span>
+  <h2>判定規則：每一關都要過 80%，再看加權總分；Qwen 兩項都沒過</h2>
+  <p>流程是串接的，前一關的錯會帶到後面，所以先用「每關都要通過」把關，再用加權總分比較。配分是看到結果之後才訂的，理由寫在表格下方，可以依實際需求調整。</p>
+  <div class="tbl"><table><thead><tr><th>關卡</th><th>配分</th><th>Opus 得分</th><th>Qwen 得分</th></tr></thead><tbody>
+    {''.join(gate_rows)}
+    <tr><td>正確性小計</td><td class="num">70</td><td class="num"><b>{corr['o']:.1f}</b></td><td class="num"><b>{corr['q']:.1f}</b></td></tr>
+    <tr><td>效率（各關「最快用時 ÷ 自己用時」的平均 × 30）</td><td class="num">30</td><td class="num"><b>{eff_o:.1f}</b></td><td class="num"><b>{eff_q:.1f}</b></td></tr>
+    <tr class="gap"><td><b>加權總分</b>（及格 80）</td><td class="num">100</td><td class="num"><b>{tot_o:.1f}</b> <span class="pf p">通過</span></td><td class="num"><b>{tot_q:.1f}</b> <span class="pf f">不通過</span></td></tr>
+  </tbody></table></div>
+  <ul>
+    <li><b>照片推回佈局配 30 分，是最重的一關</b>：只有這一關的答案不在輸入資料裡，要靠模型自己判斷空間；而且實際驗收機房時，輸入就是現場照片。</li>
+    <li><b>困難版配分是簡單版的 2 倍</b>：58 櫃、L 形機房比較接近真實機房的規模。</li>
+    <li><b>效率配 30 分</b>：流程要反覆執行，速度直接決定能不能實際使用。地端的速度還要再受硬體限制。</li>
+    <li>如果完全不計效率、只看正確性（滿分 70），是 Opus {corr['o']:.1f} 對 Qwen {corr['q']:.1f}，換算成百分比是 {corr['o'] / 0.7:.0f}% 對 {corr['q'] / 0.7:.0f}%。這時 Qwen 只比及格線低一點，結論主要靠「照片關卡不通過」這一條。</li>
+  </ul>
+</section>
+
+<section>
+  <span class="eyebrow">3 · 拉開差距的關卡</span>
   <h2>看現場照片推回機房佈局：Opus 幾乎全對，Qwen 放錯兩整列</h2>
   <p>模型只拿到 5 張現場照片、相機位置和一張空房間平面圖，要推出 61 個機櫃和 3 台空調各在哪裡、朝哪個方向。圖上沒有尺寸可以抄。</p>
   <div class="two">
@@ -284,7 +323,7 @@ BODY = f"""
 </section>
 
 <section>
-  <span class="eyebrow">3 · 建出的 3D 元件缺失</span>
+  <span class="eyebrow">4 · 建出的 3D 元件缺失</span>
   <h2>機櫃模型：尺寸都對，但細看三份作品都有缺失</h2>
   <p>任務是照 4 張參考照片做一座封閉式機櫃（Rack A）和一座開放式機架（Rack B）。紅色編號對應下方清單。「量測」是用程式直接檢查場景檔得到的；「目視」是看渲染圖判斷的，比較主觀。</p>
   {defect_block('s2_opus')}
@@ -304,7 +343,7 @@ BODY = f"""
 </section>
 
 <section>
-  <span class="eyebrow">4 · 程式問題</span>
+  <span class="eyebrow">5 · 程式問題</span>
   <h2>兩邊寫的 Blender 腳本：Qwen 的失敗和修補次數明顯較多</h2>
   <p>所有 Blender 腳本都是受測模型自己寫的。下表直接從執行紀錄統計：寫了幾支腳本、幾支執行時報錯。</p>
   <div class="tbl"><table><thead><tr><th>關卡</th><th>Opus</th><th>Qwen（high）</th></tr></thead><tbody>{''.join(code_rows)}</tbody></table></div>
@@ -319,32 +358,34 @@ BODY = f"""
 </section>
 
 <section>
-  <span class="eyebrow">5 · 地端 Flash-Next 的限制</span>
-  <h2>換成地端版本，風險會比這次量到的更高</h2>
+  <span class="eyebrow">6 · 地端 Flash-Next 的限制</span>
+  <h2>地端用 Flash-Next 只會比這次更差：三項事實</h2>
+  <p>這次測的雲端託管版是這個模型家族條件最好的版本：原廠全精度部署、1M 上下文、內建工具。地端的每一項條件都比它差或相同，沒有一項更好。</p>
   <div class="three">
-    <div class="card"><span class="big-num">{peak:,}</span><h3>Qwen 在照片關卡用到的最大上下文（token）</h3>
-      <p>地端 Flash-Next 原生上限是 262,144。這個關卡已經超過，地端要另外開延伸設定或裁剪對話才跑得完。</p></div>
-    <div class="card"><span class="big-num">約 360 GB</span><h3>原始權重大小</h3>
-      <p>模型卡列出約 180B 參數、BF16 精度，換算約 360 GB。要多張高階 GPU 才放得下；改用量化版能省硬體，但能力會下降，降多少沒有公開數據。</p></div>
-    <div class="card"><span class="big-num">0</span><h3>託管版對開源版的公開實測</h3>
-      <p>官方只說託管版「以 Flash-Next 為基礎」，沒說權重相同。託管版另有內建工具和 1M 上下文。這次的 Qwen 分數只能當作這個家族的上限參考。</p></div>
+    <div class="card"><span class="big-num">{peak:,}</span><h3>上下文不夠跑完照片關卡</h3>
+      <p>Qwen 在這一關最長的一次對話用到 {peak:,} token，超過 Flash-Next 地端原生上限 262,144。在原生設定下，這一關會在中途因為超出長度而中斷。模型卡提到可以用 YaRN 延伸到 1M，但延伸後的品質沒有公開數據。</p></div>
+    <div class="card"><span class="big-num">約 360 GB</span><h3>全精度權重要多張高階 GPU</h3>
+      <p>模型卡列出約 180B 參數、BF16 精度，換算約 360 GB。硬體不夠就要用量化版，能力會再下降，降多少沒有公開數據。</p></div>
+    <div class="card"><span class="big-num">2–15 倍</span><h3>雲端版已經比 Opus 慢這麼多</h3>
+      <p>地端的速度取決於自己的 GPU 數量，一般不會比原廠雲端快。照片關卡雲端版用了 58 分鐘，上限是 60 分鐘，地端再慢一點就會逾時。</p></div>
   </div>
   <ul>
-    <li>工具呼叫要靠地端推論框架的解析器，穩定度可能和託管版不同。這次託管版每個關卡仍有 2–8 次工具用法錯誤。</li>
-    <li>速度：託管版已經比 Opus 慢 2–15 倍；地端的速度取決於硬體，沒有量測。</li>
-    <li>授權是 qwen-community-1.0，商用前要確認條款。</li>
+    <li>其他關卡的上下文用量在 5–13 萬 token 之間，地端原生上限放得下；超出的是照片關卡。</li>
+    <li>工具呼叫要靠地端推論框架的解析器，穩定度可能和雲端版不同。這次雲端版每個關卡仍有 2–8 次工具用法錯誤。</li>
+    <li>官方只說雲端版「以 Flash-Next 為基礎」，沒有說兩者權重相同，也沒有兩者對比的公開實測。授權是 qwen-community-1.0，商用前要確認條款。</li>
+    <li><b>以上是依據事實的推論，不是地端實測結果。</b>repo 裡附有重現手冊（<code>datacenter/HANDOFF.md</code>），地端團隊可以把同一套測試接到自己的 Flash-Next 上跑一次來確認。</li>
   </ul>
 </section>
 
 <section>
-  <span class="eyebrow">6 · 這份結果的限制與下一步</span>
+  <span class="eyebrow">7 · 這份結果的限制與下一步</span>
   <h2>第一階段還不足以下最後結論</h2>
   <ul>
     <li>每個關卡、每個模型在同一設定下只跑 1 次，結果可能有運氣成分。</li>
     <li>Opus 是在同一台機器上用全新對話執行，工具限制靠指令要求；Qwen 的限制由程式強制。Opus 跑照片關卡時，Qwen 的答案曾誤留在磁碟上約 2 分鐘，從結果看沒有被使用（兩邊錯的地方完全不同）。</li>
     <li>題目和計分程式由主控的 Claude 撰寫，Opus 是受測者之一；計分全部用程式對答案卷，沒有人為給分。</li>
     <li><b>第二階段</b>正在製作 4 個沒有標準答案可抄的關卡：竣工比對（設計圖對現場照片找差異）、限制式佈局設計、3D 管線繞行、依三視圖復刻設備。</li>
-    <li>若要回答「地端」的問題，需要把同一套測試接到實際的地端 Flash-Next 上跑一次。</li>
+    <li>這次沒有實測地端的 Flash-Next；「地端只會更差」是推論。重現手冊在 <code>datacenter/HANDOFF.md</code>。</li>
   </ul>
 </section>
 </main>

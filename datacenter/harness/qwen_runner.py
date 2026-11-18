@@ -46,11 +46,21 @@ TOOLS = [
 ]
 
 
+class ApiStop(Exception):
+    pass
+
+
 class Runner:
     def __init__(self, a):
         self.a = a
         self.run = pathlib.Path(a.run).resolve()
-        self.key = os.environ.get("or_key") or os.environ["OPENROUTER_API_KEY"]
+        self.local = bool(a.base_url)
+        self.url = (a.base_url.rstrip("/") + "/chat/completions") if a.base_url else API
+        if self.local:
+            self.key = os.environ.get(a.api_key_env or "", "") or "none"
+        else:
+            self.key = os.environ.get(a.api_key_env or "or_key") or os.environ["OPENROUTER_API_KEY"]
+        self.peak_prompt = 0
         self.log = (self.run / "transcript.jsonl").open("a")
         self.cost = 0.0
         self.tokens = {"prompt": 0, "completion": 0, "cached": 0, "reasoning": 0}
@@ -120,14 +130,21 @@ class Runner:
     # ---- model ----
     def call(self, messages):
         body = {"model": self.a.model, "messages": messages, "tools": TOOLS, "tool_choice": "auto",
-                "usage": {"include": True}, "max_tokens": 32000}
+                "max_tokens": self.a.max_tokens}
+        if not self.local:
+            body["usage"] = {"include": True}
+        if self.a.extra_body:
+            body.update(json.loads(self.a.extra_body))
         if self.a.reasoning_effort:
-            body["reasoning"] = {"effort": self.a.reasoning_effort}
-        if self.a.provider:
+            if self.local:
+                body["reasoning_effort"] = self.a.reasoning_effort
+            else:
+                body["reasoning"] = {"effort": self.a.reasoning_effort}
+        if self.a.provider and not self.local:
             body["provider"] = {"order": [self.a.provider], "allow_fallbacks": False}
         for attempt in range(6):
             try:
-                r = requests.post(API, headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json",
+                r = requests.post(self.url, headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json",
                                                 "X-Title": "dc-bench"}, json=body, timeout=600)
                 if r.status_code == 200:
                     d = r.json()
@@ -136,12 +153,13 @@ class Runner:
                     self.rec(kind="api_error", body=d)
                 else:
                     self.rec(kind="http_error", status=r.status_code, body=r.text[:2000])
-                    if r.status_code in (400, 401, 402, 403):
-                        raise SystemExit(f"OpenRouter {r.status_code}: {r.text[:500]}")
+                    if r.status_code in (400, 401, 402, 403, 413, 422):
+                        # e.g. context length exceeded on a local server: end the run cleanly and record why
+                        raise ApiStop(f"HTTP {r.status_code}: {r.text[:300]}")
             except requests.RequestException as e:
                 self.rec(kind="net_error", error=str(e))
             time.sleep(min(60, 5 * 2 ** attempt))
-        raise SystemExit("OpenRouter: too many failures")
+        raise ApiStop("too many API failures")
 
     def go(self):
         sysmsg = (HERE / "prompts" / "system.md").read_text()
@@ -159,10 +177,15 @@ class Runner:
             if self.cost >= self.a.max_cost:
                 end_reason = "cost"
                 break
-            d = self.call(messages)
+            try:
+                d = self.call(messages)
+            except ApiStop as e:
+                end_reason = f"api_stop: {e}"
+                break
             u = d.get("usage") or {}
             self.cost += float(u.get("cost") or 0)
             self.tokens["prompt"] += u.get("prompt_tokens", 0)
+            self.peak_prompt = max(self.peak_prompt, u.get("prompt_tokens", 0))
             self.tokens["completion"] += u.get("completion_tokens", 0)
             self.tokens["cached"] += (u.get("prompt_tokens_details") or {}).get("cached_tokens", 0) or 0
             self.tokens["reasoning"] += (u.get("completion_tokens_details") or {}).get("reasoning_tokens", 0) or 0
@@ -203,7 +226,7 @@ class Runner:
             for _ in range(2):
                 subprocess.run(["bench", "submit", self.a.stage], cwd=self.run, capture_output=True,
                                env=dict(os.environ, BENCH_RUN=str(self.run)))
-        summary = {"kind": "end", "reason": end_reason, "turns": turn + 1, "cost_usd": round(self.cost, 4),
+        summary = {"kind": "end", "reason": end_reason, "turns": turn + 1, "cost_usd": round(self.cost, 4), "peak_prompt_tokens": self.peak_prompt,
                    "tokens": self.tokens, "seconds": round(time.time() - t0, 1),
                    "bench_calls": self.bench_state()["used"], "auto_submitted": not st.get("submitted")}
         self.rec(**summary)
@@ -218,6 +241,11 @@ def main():
     ap.add_argument("--prompt", help="prompt file name in prompts/ without .md (default: the stage name)")
     ap.add_argument("--model", default="qwen/qwen3.8-flash")
     ap.add_argument("--provider", default="Alibaba")
+    ap.add_argument("--base-url", help="OpenAI-compatible endpoint of a self-hosted server, e.g. http://localhost:8000/v1 "
+                                       "(then OpenRouter-only fields are not sent)")
+    ap.add_argument("--api-key-env", help="name of the environment variable holding the API key (default: or_key)")
+    ap.add_argument("--extra-body", help="JSON merged into every request, e.g. '{\"reasoning_effort\": \"high\"}'")
+    ap.add_argument("--max-tokens", type=int, default=32000)
     ap.add_argument("--max-cost", type=float, default=1.5)
     ap.add_argument("--max-turns", type=int, default=150)
     ap.add_argument("--reasoning-effort", choices=["low", "medium", "high"], default=None,

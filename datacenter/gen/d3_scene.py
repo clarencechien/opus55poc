@@ -152,27 +152,33 @@ def build(seed: int) -> dict:
         s = p0 + k * pitch
         ports.append({"id": f"P{k + 1}", "point": [r3(s), r3(off), 3.0] if ax == 0 else [r3(off), r3(s), 3.0]})
 
-    # ---- two air ducts crossing the hall in different directions (0.8 x 0.45, z 2.95-3.4), seeded positions
-    def duct_ok(b):
+    # ---- two air ducts crossing the hall in different directions (0.8 wide x 0.45 high, z 2.95-3.4), seeded positions:
+    #      Duct_1 runs parallel to the manifold wall 2-4.5 m in front of it (every pipe has to pass it),
+    #      Duct_2 runs square to that wall with at least two targets on either side.
+    def duct_box(name, run_axis, v):       # a duct running along run_axis, centred at v on the other plan axis
+        if run_axis == 0:
+            return box(name, h, (W - h) if v + 0.4 < y3 - h else (xD - h), v - 0.4, v + 0.4, 2.95, 3.4)
+        return box(name, v - 0.4, v + 0.4, h, (D - h) if v + 0.4 < xD - h else (y3 - h), 2.95, 3.4)
+
+    def duct_ok(b, run_axis, v):
+        if min(abs(v - g) for g in (gy if run_axis == 0 else gx).values()) < 1.0:   # off the parallel beams, columns, walls
+            return False
         if overlap(b, manifold, gap=0.8):
             return False
-        return not any(overlap(b, t) and ((t["max"][0] - t["min"][0]) > (t["max"][1] - t["min"][1])) ==
-                       ((b["max"][0] - b["min"][0]) > (b["max"][1] - b["min"][1])) for t in trays)
+        return not any(overlap(b, t) and ((t["max"][0] - t["min"][0]) > (t["max"][1] - t["min"][1])) == (run_axis == 0)
+                       for t in trays)                                                # not lengthwise through a cable tray
     ducts = []
     for _ in range(500):
-        yd = round(rng.uniform(1.2, D - 1.2) * 10) / 10
-        if min(abs(yd - g) for g in gy.values()) < 1.0:
-            continue
-        b = box("Duct_1", h, (W - h) if yd + 0.4 < y3 - h else (xD - h), yd - 0.4, yd + 0.4, 2.95, 3.4)
-        if duct_ok(b):
+        v = round((face + sgn * rng.uniform(2.0, 4.5)) * 10) / 10
+        b = duct_box("Duct_1", ax, v)
+        if duct_ok(b, ax, v):
             ducts.append(b)
             break
-    for _ in range(500):
-        xd = round(rng.uniform(1.2, W - 1.2) * 10) / 10
-        if min(abs(xd - g) for g in gx.values()) < 1.0:
-            continue
-        b = box("Duct_2", xd - 0.4, xd + 0.4, h, (D - h) if xd + 0.4 < xD - h else (y3 - h), 2.95, 3.4)
-        if duct_ok(b):
+    for _ in range(2000):
+        v = round(rng.uniform(lo + 1.0, hi - 1.0) * 10) / 10
+        sides = [sum(1 for t in tpts.values() if t[ax] < v - 0.7), sum(1 for t in tpts.values() if t[ax] > v + 0.7)]
+        b = duct_box("Duct_2", 1 - ax, v)
+        if min(sides) >= 2 and duct_ok(b, 1 - ax, v):
             ducts.append(b)
             break
     assert len(ducts) == 2, "could not place the ducts"

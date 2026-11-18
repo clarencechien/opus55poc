@@ -21,11 +21,11 @@ import sys
 
 SEGMENTS = 64  # cylinder mesh resolution in target.blend
 
-COLORS = {  # a few distinct flat colours (group -> RGB)
-    "body": (0.80, 0.82, 0.84), "plinth": (0.22, 0.23, 0.25), "feet": (0.08, 0.08, 0.09),
-    "door": (0.36, 0.52, 0.72), "display": (0.05, 0.07, 0.09), "handle": (0.93, 0.93, 0.95),
+COLORS = {  # a few distinct flat colours (group -> sRGB)
+    "body": (0.74, 0.76, 0.79), "plinth": (0.36, 0.37, 0.40), "feet": (0.15, 0.15, 0.16),
+    "door": (0.36, 0.52, 0.72), "display": (0.12, 0.16, 0.20), "handle": (0.95, 0.95, 0.97),
     "control_box": (0.92, 0.70, 0.12), "top_pipes": (0.80, 0.36, 0.14), "rear_manifold": (0.80, 0.36, 0.14),
-    "louvre": (0.22, 0.23, 0.25), "lifting_eyes": (0.75, 0.12, 0.12), "gland_box": (0.25, 0.55, 0.30),
+    "louvre": (0.36, 0.37, 0.40), "lifting_eyes": (0.75, 0.12, 0.12), "gland_box": (0.25, 0.55, 0.30),
 }
 GROUP_ORDER = list(COLORS)
 
@@ -204,11 +204,12 @@ def build(spec: dict, out_dir: pathlib.Path) -> None:
     mats = {}
     for g, c in COLORS.items():
         m = bpy.data.materials.new("D5_" + g)
-        m.diffuse_color = (*c, 1.0)
+        lin = tuple(v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for v in c)  # sRGB -> linear
+        m.diffuse_color = (*lin, 1.0)
         m.use_nodes = True
         bsdf = m.node_tree.nodes.get("Principled BSDF")
         if bsdf:
-            bsdf.inputs["Base Color"].default_value = (*c, 1.0)
+            bsdf.inputs["Base Color"].default_value = (*lin, 1.0)
         mats[g] = m
     rot = {"z": mathutils.Matrix.Identity(4), "x": mathutils.Matrix.Rotation(math.pi / 2, 4, "Y"),
            "y": mathutils.Matrix.Rotation(math.pi / 2, 4, "X")}
