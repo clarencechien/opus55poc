@@ -46,6 +46,61 @@ Images after the plan: a redraw of the submission's layout_pred.json in the same
 original plan, the numbers are right), then a top and an isometric render of the Blender shell.""",
 }
 
+S2_ITEMS = {
+    "A": ["perforated_front_door", "perforated_rear_door", "solid_side_panels", "top_panel_cable_entry",
+          "feet_or_casters", "mounting_rails", "servers_varied_heights", "blanking_panels", "status_leds", "dark_finish"],
+    "B": ["four_posts_with_holes_or_rails", "top_and_bottom_frame", "cable_management", "partial_population",
+          "no_doors_or_side_panels"],
+}
+RUBRIC["s2"] = """The task given to the modeller: from the reference photos (first images), build two rack models in Blender.
+Rack A, a closed server cabinet like the black cabinets in the NERSC photos: 600 W x 1200 D x 2000 H mm, perforated front
+and rear doors, solid side panels, top panel with cable-entry openings, leveling feet or casters, 19-inch mounting rails,
+servers of varied heights visible through the front door with blanking panels and status LEDs, dark finish.
+Rack B, an open 4-post frame like the open racks on the raised floor: 600 W x 1000 D x 2000 H mm, four posts with holes or
+rails, top and bottom frame, cable management, partially populated (equipment, patch panels, cabling, open space), no doors
+or side panels. Both stand on the floor with the front facing the viewer of the 'front' render.
+You get Workbench (flat-shaded, untextured) renders: front, back, right side, isometric and a close 3/4 view of each rack.
+Judge each checklist item as present / partial / absent from what the renders show, and rate how closely each rack
+resembles its reference photos (1 = not at all, 5 = convincingly the same kind of equipment), allowing for the flat
+preview shading."""
+S2_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["checks", "likeness", "summary"],
+    "properties": {
+        "checks": {"type": "array", "items": {
+            "type": "object", "additionalProperties": False, "required": ["rack", "item", "verdict", "note"],
+            "properties": {"rack": {"type": "string", "enum": ["A", "B"]},
+                           "item": {"type": "string", "enum": S2_ITEMS["A"] + S2_ITEMS["B"]},
+                           "verdict": {"type": "string", "enum": ["present", "partial", "absent"]},
+                           "note": {"type": "string"}}}},
+        "likeness": {"type": "object", "additionalProperties": False, "required": ["A", "B"],
+                     "properties": {"A": {"type": "integer", "minimum": 1, "maximum": 5},
+                                    "B": {"type": "integer", "minimum": 1, "maximum": 5}}},
+        "summary": {"type": "string"},
+    },
+}
+S2_PAIR_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["better_rack_A", "better_rack_B", "better_overall", "confidence", "reason"],
+    "properties": {k: {"type": "string", "enum": ["X", "Y", "tie"]} for k in ("better_rack_A", "better_rack_B", "better_overall")}
+    | {"confidence": {"type": "string", "enum": ["low", "medium", "high"]}, "reason": {"type": "string"}},
+}
+
+
+def s2_score(g):
+    """60 points from the judge's own verdicts: rack A checklist 30, rack B checklist 20, likeness 10 (A 6, B 4)."""
+    credit = {"present": 1.0, "partial": 0.5, "absent": 0.0}
+    out = {}
+    for rack, pts in (("A", 30), ("B", 20)):
+        v = {}
+        for c in g["checks"]:
+            if c["rack"] == rack and c["item"] in S2_ITEMS[rack]:
+                v[c["item"]] = credit[c["verdict"]]
+        out[f"checklist_{rack}"] = round(pts * sum(v.get(i, 0.0) for i in S2_ITEMS[rack]) / len(S2_ITEMS[rack]), 2)
+    out["likeness"] = round(6 * (g["likeness"]["A"] - 1) / 4 + 4 * (g["likeness"]["B"] - 1) / 4, 2)
+    out["total_60"] = round(sum(out.values()), 2)
+    out["pct"] = round(out["total_60"] / 60 * 100, 1)
+    return out
+
+
 GRADE_SCHEMA = {
     "type": "object", "additionalProperties": False,
     "required": ["checks", "category_scores", "total", "summary"],
@@ -120,6 +175,38 @@ def to_gemini(parts):
     return out
 
 
+def small_img(path: pathlib.Path, width=1024):
+    from io import BytesIO
+    from PIL import Image
+    im = Image.open(path).convert("RGB")
+    if im.width > width:
+        im = im.resize((width, int(im.height * width / im.width)))
+    buf = BytesIO()
+    im.save(buf, "JPEG", quality=85)
+    return {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()}}
+
+
+def s2_reference_parts():
+    ref = ROOT / "ref"
+    parts = [{"type": "text", "text": "Reference photos:"}]
+    for f in ("rack_row_front_nersc.jpg", "rack_rear_cray_nersc.jpg", "rack_open_frame_raised_floor.jpg"):
+        parts += [{"type": "text", "text": f}, small_img(ref / f)]
+    return parts
+
+
+def s2_submission_parts(label, run):
+    rv = run / "review"
+    parts = []
+    for rack in ("A", "B"):
+        for v in ("front", "back", "right", "iso", "close"):
+            f = rv / f"review_Rack{rack}_{v}.png"
+            if f.exists():
+                parts += [{"type": "text", "text": f"Submission {label}, rack {rack}, {v} view"}, small_img(f)]
+    if not parts:
+        parts = [{"type": "text", "text": f"Submission {label}: no renders (nothing was built)"}]
+    return parts
+
+
 def call(model, messages, schema, name):
     key = os.environ["gemini_key"]
     system = messages[0]["content"]
@@ -167,25 +254,45 @@ def main():
               "answer from the inputs yourself, be strict and specific, and mark anything genuinely ambiguous in the "
               "drawing as 'ambiguous' rather than wrong.")
     result = {"model": a.model, "api": "Gemini API (direct)", "cost_note": "estimated from token counts", "absolute": {"X": [], "Y": []}, "pairwise": None, "cost_usd": 0.0}
-    for label, run in (("X", order[0]), ("Y", order[1])):
-        for k in range(a.repeats):
-            msgs = [{"role": "system", "content": sysmsg},
-                    {"role": "user", "content": [{"type": "text", "text": RUBRIC[a.stage] + "\n\nThe original plan:"}, img(plan)]
-                     + submission_parts(label, run)
-                     + [{"type": "text", "text": "Grade this submission. List one check per thing you verified (several per category; for racks cover count, positions, facing, ids, sizes), each tagged with its category. Category scores must not exceed their maxima; total = their sum."}]}]
-            g, u = call(a.model, msgs, GRADE_SCHEMA, "grade")
-            result["cost_usd"] += float(u.get("cost") or 0)
-            g["derived"] = derived_score(a.stage, g)
-            result["absolute"][label].append(g)
-            print(label, k, "raw", g["total"], "derived", g["derived"], flush=True)
-    msgs = [{"role": "system", "content": sysmsg},
-            {"role": "user", "content": [{"type": "text", "text": RUBRIC[a.stage] + "\n\nThe original plan:"}, img(plan)]
-             + submission_parts("X", order[0]) + submission_parts("Y", order[1])
-             + [{"type": "text", "text": "Compare submissions X and Y. Which is better overall and per category?"}]}]
-    p, u = call(a.model, msgs, PAIR_SCHEMA, "pairwise")
-    result["cost_usd"] += float(u.get("cost") or 0)
-    result["pairwise"] = p
-    print("pairwise", p["better"], p["confidence"], p["per_category"], flush=True)
+    if a.stage == "s2":
+        head = [{"type": "text", "text": RUBRIC["s2"]}] + s2_reference_parts()
+        for label, run in (("X", order[0]), ("Y", order[1])):
+            for k in range(a.repeats):
+                msgs = [{"role": "system", "content": sysmsg},
+                        {"role": "user", "content": head + s2_submission_parts(label, run)
+                         + [{"type": "text", "text": "Grade this submission: one check for every checklist item of both racks, then the likeness ratings."}]}]
+                g, u = call(a.model, msgs, S2_SCHEMA, "grade")
+                result["cost_usd"] += float(u.get("cost") or 0)
+                g["derived"] = s2_score(g)
+                result["absolute"][label].append(g)
+                print(label, k, g["derived"], flush=True)
+        msgs = [{"role": "system", "content": sysmsg},
+                {"role": "user", "content": head + s2_submission_parts("X", order[0]) + s2_submission_parts("Y", order[1])
+                 + [{"type": "text", "text": "Compare submissions X and Y: which rack A is better, which rack B, and overall?"}]}]
+        p, u = call(a.model, msgs, S2_PAIR_SCHEMA, "pairwise")
+        result["cost_usd"] += float(u.get("cost") or 0)
+        result["pairwise"] = p
+        print("pairwise", p, flush=True)
+    else:
+        for label, run in (("X", order[0]), ("Y", order[1])):
+            for k in range(a.repeats):
+                msgs = [{"role": "system", "content": sysmsg},
+                        {"role": "user", "content": [{"type": "text", "text": RUBRIC[a.stage] + "\n\nThe original plan:"}, img(plan)]
+                         + submission_parts(label, run)
+                         + [{"type": "text", "text": "Grade this submission. List one check per thing you verified (several per category; for racks cover count, positions, facing, ids, sizes), each tagged with its category. Category scores must not exceed their maxima; total = their sum."}]}]
+                g, u = call(a.model, msgs, GRADE_SCHEMA, "grade")
+                result["cost_usd"] += float(u.get("cost") or 0)
+                g["derived"] = derived_score(a.stage, g)
+                result["absolute"][label].append(g)
+                print(label, k, "raw", g["total"], "derived", g["derived"], flush=True)
+        msgs = [{"role": "system", "content": sysmsg},
+                {"role": "user", "content": [{"type": "text", "text": RUBRIC[a.stage] + "\n\nThe original plan:"}, img(plan)]
+                 + submission_parts("X", order[0]) + submission_parts("Y", order[1])
+                 + [{"type": "text", "text": "Compare submissions X and Y. Which is better overall and per category?"}]}]
+        p, u = call(a.model, msgs, PAIR_SCHEMA, "pairwise")
+        result["cost_usd"] += float(u.get("cost") or 0)
+        result["pairwise"] = p
+        print("pairwise", p["better"], p["confidence"], p["per_category"], flush=True)
     (outdir / "judge.json").write_text(json.dumps(result, indent=1, ensure_ascii=False))
     (outdir / "mapping.json").write_text(json.dumps(mapping, indent=1))
     print("cost", round(result["cost_usd"], 4))

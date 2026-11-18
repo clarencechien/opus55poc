@@ -81,10 +81,12 @@ def do_render(req, renders_dir=None, path=None):
     sh.light, sh.color_type = "STUDIO", "MATERIAL"
     sh.show_cavity, sh.show_object_outline = True, True
     sh.show_shadows = view not in {"top"}
+    sh.background_type, sh.background_color = "VIEWPORT", (0.78, 0.79, 0.8)
     sync_viewport_colors()
     sc.render.resolution_x, sc.render.resolution_y, sc.render.resolution_percentage = w, h, 100
     sc.render.film_transparent = False
     sc.world = sc.world or bpy.data.worlds.new("World")
+    sc.world.color = (0.78, 0.79, 0.8)  # Workbench final renders use the world colour as background
     if path is None:
         idx = len([f for f in os.listdir(renders_dir) if f.endswith(".png")]) + 1
         safe = "".join(ch if ch.isalnum() else "_" for ch in view)[:40]

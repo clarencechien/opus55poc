@@ -44,6 +44,6 @@ for v in views:
         lo, hi = scene_bounds()
         ctr = (lo + hi) / 2
         tgt = mathutils.Vector((ctr.x, lo.y, lo.z + (hi.z - lo.z) * 0.55))
-        cam = tgt + mathutils.Vector((-0.9, -1.4, 0.15))
+        cam = tgt + mathutils.Vector((-1.2, -2.3, 0.25))
         view = f"cam:{cam.x:.3f},{cam.y:.3f},{cam.z:.3f}>{tgt.x:.3f},{tgt.y:.3f},{tgt.z:.3f}"
-    print(do_render({"view": view, "res": "1024x768", "lens": 24}, path=os.path.join(out, f"review_{prefix}{v}.png")))
+    print(do_render({"view": view, "res": "1024x768", "lens": 35 if v == "close" else 24}, path=os.path.join(out, f"review_{prefix}{v}.png")))
