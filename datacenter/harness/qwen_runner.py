@@ -26,6 +26,7 @@ import requests
 HERE = pathlib.Path(__file__).resolve().parent
 API = "https://openrouter.ai/api/v1/chat/completions"
 TEXT_LIMIT = 20000
+IMAGE_MAX = 1568
 
 TOOLS = [
     {"type": "function", "function": {
@@ -96,8 +97,23 @@ class Runner:
             return f"error: no such file {path}", None
         mt = mimetypes.guess_type(q.name)[0] or ""
         if mt.startswith("image/"):
-            data = base64.b64encode(q.read_bytes()).decode()
-            return f"image {q.relative_to(self.run)} attached below", {"type": "image_url", "image_url": {"url": f"data:{mt};base64,{data}"}}
+            # downscale like Claude Code's image reading does (long edge <= 1568 px) so both sides see similar pixels
+            from io import BytesIO
+            from PIL import Image
+            im = Image.open(q)
+            im.load()
+            scale = min(1.0, IMAGE_MAX / max(im.size))
+            if scale < 1.0:
+                im = im.resize((round(im.width * scale), round(im.height * scale)), Image.LANCZOS)
+            buf = BytesIO()
+            if mt == "image/png":
+                im.save(buf, "PNG", optimize=True)
+            else:
+                im.convert("RGB").save(buf, "JPEG", quality=90)
+                mt = "image/jpeg"
+            data = base64.b64encode(buf.getvalue()).decode()
+            return (f"image {q.relative_to(self.run)} ({im.width}x{im.height}) attached below",
+                    {"type": "image_url", "image_url": {"url": f"data:{mt};base64,{data}"}})
         txt = q.read_text(errors="replace")
         return (txt if len(txt) <= TEXT_LIMIT else txt[:TEXT_LIMIT] + f"\n... [{len(txt) - TEXT_LIMIT} chars cut]"), None
 
