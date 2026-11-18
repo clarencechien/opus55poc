@@ -14,11 +14,16 @@ Method
      earlier. Consecutive rows must be front-to-front >= 1200 apart, back-to-back >= 900 apart, or >= 3000 apart when
      they face the same way.
   2. Access. Each zone gets one cross aisle ("spine", 900 wide) across its rows, or none; rows may dead-end at a wall.
-  3. Search. Whole hall in one direction, and the hall split in two zones by a north-south or an east-west line with
-     every combination of row directions, spine positions and packing side; the rule checker removes bad racks.
-  4. Polish of the best candidates: bad racks removed, removed racks re-inserted one by one where they fit, then greedy
-     insertion of extra racks on a 50 mm lattice (any facing), then 8 racks near CRAH units widened to 800 mm GPU racks
-     where the rows have slack (or at the lowest cost in racks), then insertion again. The best result is kept.
+  3. Search. (A) whole hall in one row direction; (B) the hall split in two zones by a north-south or an east-west
+     line, every combination of row directions, spine positions and column handling (ignore / columns inside rows /
+     900 bypass gap in the row behind a column or CRAH that cuts an aisle); (C) the best split lines refined in
+     100 mm steps; (D) one zone of the best two-zone layout split again (three zones). The rule checker removes
+     bad racks; the count of the remaining racks ranks the layouts.
+  4. Polish of the best candidates: removed racks re-inserted one by one where they fit, greedy insertion of extra
+     racks on a 50 mm lattice (any facing), 8 racks near CRAH units widened to 800 mm GPU racks where the rows have
+     slack (or at the lowest cost in racks), insertion again.
+  5. Large-neighbourhood search from the best few: clear a random window, refill it with the row-band DP in a random
+     direction, re-insert, keep the result if it is not worse. The best result is written out.
 """
 from __future__ import annotations
 
@@ -435,7 +440,8 @@ class Solver:
         best, it, wins = racks, 0, 0
         while time.time() - t0 < seconds:
             it += 1
-            w, h = self.rng.choice(range(2400, 12001, 600)), self.rng.choice(range(2400, 12001, 600))
+            hi = 19200 if self.rng.random() < 0.25 else 9000
+            w, h = self.rng.choice(range(2400, hi + 1, 600)), self.rng.choice(range(2400, hi + 1, 600))
             wx = self.rng.choice(np.arange(x0 - w / 2, x1 - w / 2, 300))
             wy = self.rng.choice(np.arange(y0 - h / 2, y1 - h / 2, 300))
             win = (max(x0, wx), max(y0, wy), min(x1, wx + w), min(y1, wy + h))
@@ -577,7 +583,7 @@ class Solver:
             return (x0, y0, c, y1), (c, y0, x1, y1)
         return (x0, y0, x1, c), (x0, c, x1, y1)
 
-    def search(self, budget_s=600.0, coarse=600, cut_step=600, top=12, lns_top=3, lns_s=240.0, cuts=None, refine=3):
+    def search(self, budget_s=600.0, coarse=600, cut_step=600, top=12, lns_top=3, lns_s=240.0, cuts=None, refine=3, three=1):
         t0 = time.time()
         x0, y0, x1, y1 = self.bounds
         whole = (x0, y0, x1, y1)
@@ -649,6 +655,38 @@ class Solver:
             for dc in (0, -300, -200, -100, 100, 200, 300):
                 if dc == 0 or (kind, c + dc) not in cut_best:
                     explore_cut(kind, c + dc, 300)
+        # D. three zones: split one zone of the best two-zone layouts again (the other zone stays as it is)
+        two = [v[1] for v in sorted(pool.values(), key=lambda v: -v[0]) if len(v[1]) == 2]
+        seen_zones = set()
+        for parts in two:
+            key = tuple(sorted(p[0] for p in parts))
+            if key in seen_zones or len(seen_zones) >= three:
+                continue
+            seen_zones.add(key)
+            for i in (0, 1):
+                fixed, zone = parts[1 - i], parts[i][0]
+                sub = [("x", float(c)) for c in np.arange(zone[0] + 2400, zone[2] - 2400 + 1, cut_step)]
+                sub += [("y", float(c)) for c in np.arange(zone[1] + 2400, zone[3] - 2400 + 1, cut_step)]
+                top3 = 0
+                for kind, c in sub:
+                    za = (zone[0], zone[1], c, zone[3]) if kind == "x" else (zone[0], zone[1], zone[2], c)
+                    zb = (c, zone[1], zone[2], zone[3]) if kind == "x" else (zone[0], c, zone[2], zone[3])
+                    ranked = []
+                    for z in (za, zb):
+                        opts = []
+                        for axis in (0, 1):
+                            for strict in (0, 2):
+                                for q in self.spine_positions(z, axis, coarse):
+                                    if strict < 2 or q is not None:
+                                        opts.append((len(self.build([fixed, (z, axis, q, "lo", strict)])), axis, q, strict))
+                        opts.sort(key=lambda o: -o[0])
+                        ranked.append([o[1:] for o in opts[:3]])
+                    for a0, q0, s0 in ranked[0]:
+                        for a1, q1, s1 in ranked[1]:
+                            pa, pb = (za, a0, q0, "lo", s0), (zb, a1, q1, "lo", s1)
+                            for seq in ([fixed, pa, pb], [fixed, pb, pa], [pa, pb, fixed], [pb, pa, fixed]):
+                                top3 = max(top3, consider(seq))
+                self.log(f"[{time.time() - t0:6.1f}s] three zones (zone {i} of {key} split again): best {top3}  (overall {best()})")
         # polish the best distinct candidates
         order = sorted(pool.items(), key=lambda kv: -kv[1][0])
         results, seen = [], set()
@@ -710,6 +748,7 @@ def main():
     ap.add_argument("--cut-step", type=int, default=600, help="spacing of the zone split lines tried (mm)")
     ap.add_argument("--cuts", help="only these split lines, e.g. 'y=4300,x=14500' (default: all, --cut-step apart)")
     ap.add_argument("--refine", type=int, default=3, help="number of best split lines refined in 100 mm steps")
+    ap.add_argument("--three", type=int, default=1, help="number of best two-zone splits extended to three zones")
     ap.add_argument("--lns-top", type=int, default=3, help="how many polished candidates get the large-neighbourhood search")
     ap.add_argument("--lns", type=float, default=240, help="seconds of large-neighbourhood search per candidate")
     ap.add_argument("--seed", type=int, default=0)
@@ -718,7 +757,7 @@ def main():
     room_json = json.loads(pathlib.Path(a.room).read_text())
     sv = Solver(room_json, seed=a.seed)
     cuts = [(c.split("=")[0], float(c.split("=")[1])) for c in a.cuts.split(",")] if a.cuts else None
-    results, pool = sv.search(budget_s=a.budget, top=a.top, cut_step=a.cut_step, lns_top=a.lns_top, lns_s=a.lns, cuts=cuts, refine=a.refine)
+    results, pool = sv.search(budget_s=a.budget, top=a.top, cut_step=a.cut_step, lns_top=a.lns_top, lns_s=a.lns, cuts=cuts, refine=a.refine, three=a.three)
     n, cnt, desc, racks, _ = results[0]
     V = sv.check(racks)
     assert not V.any(), "reference design violates a rule"

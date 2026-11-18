@@ -1,1 +1,8 @@
-{"mode": "flat", "cams": [1, 2, 3, 4, 5, 6, 7]}
+{"mode": "flat", "jobs": [
+  {"tag": "rowA", "group": "A", "cams": [6]},
+  {"tag": "rowB", "group": "B", "cams": [6]},
+  {"tag": "rowC", "group": "C", "cams": [1]},
+  {"tag": "rowD", "group": "D", "cams": [1]},
+  {"tag": "rowE", "group": "E", "cams": [3]},
+  {"tag": "rowF", "group": "F", "cams": [3]}
+]}
