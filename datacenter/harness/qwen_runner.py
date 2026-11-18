@@ -61,6 +61,7 @@ class Runner:
         else:
             self.key = os.environ.get(a.api_key_env or "or_key") or os.environ["OPENROUTER_API_KEY"]
         self.peak_prompt = 0
+        self.truncations = 0
         self.log = (self.run / "transcript.jsonl").open("a")
         self.cost = 0.0
         self.tokens = {"prompt": 0, "completion": 0, "cached": 0, "reasoning": 0}
@@ -198,6 +199,13 @@ class Runner:
                      finish=d["choices"][0].get("finish_reason"))
             calls = msg.get("tool_calls") or []
             if not calls:
+                if d["choices"][0].get("finish_reason") == "length" and self.truncations < 3:
+                    # the reply hit the output limit mid-thought: that is not the model choosing to stop
+                    self.truncations += 1
+                    messages.append({"role": "user", "content": "[harness] Your last reply was cut off at the output-token limit "
+                                     "before any tool call. Continue from where you were and act through tool calls."})
+                    self.rec(kind="truncated", turn=turn, n=self.truncations)
+                    continue
                 end_reason = "model_stopped"
                 break
             images = []
@@ -226,7 +234,7 @@ class Runner:
             for _ in range(2):
                 subprocess.run(["bench", "submit", self.a.stage], cwd=self.run, capture_output=True,
                                env=dict(os.environ, BENCH_RUN=str(self.run)))
-        summary = {"kind": "end", "reason": end_reason, "turns": turn + 1, "cost_usd": round(self.cost, 4), "peak_prompt_tokens": self.peak_prompt,
+        summary = {"kind": "end", "reason": end_reason, "turns": turn + 1, "cost_usd": round(self.cost, 4), "peak_prompt_tokens": self.peak_prompt, "truncated_replies": self.truncations,
                    "tokens": self.tokens, "seconds": round(time.time() - t0, 1),
                    "bench_calls": self.bench_state()["used"], "auto_submitted": not st.get("submitted")}
         self.rec(**summary)
@@ -245,7 +253,7 @@ def main():
                                        "(then OpenRouter-only fields are not sent)")
     ap.add_argument("--api-key-env", help="name of the environment variable holding the API key (default: or_key)")
     ap.add_argument("--extra-body", help="JSON merged into every request, e.g. '{\"reasoning_effort\": \"high\"}'")
-    ap.add_argument("--max-tokens", type=int, default=32000)
+    ap.add_argument("--max-tokens", type=int, default=64000)
     ap.add_argument("--max-cost", type=float, default=1.5)
     ap.add_argument("--max-turns", type=int, default=150)
     ap.add_argument("--reasoning-effort", choices=["low", "medium", "high"], default=None,

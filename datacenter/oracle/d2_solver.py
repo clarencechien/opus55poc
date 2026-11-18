@@ -577,7 +577,7 @@ class Solver:
             return (x0, y0, c, y1), (c, y0, x1, y1)
         return (x0, y0, x1, c), (x0, c, x1, y1)
 
-    def search(self, budget_s=600.0, coarse=600, cut_step=600, top=12, lns_top=3, lns_s=240.0):
+    def search(self, budget_s=600.0, coarse=600, cut_step=600, top=12, lns_top=3, lns_s=240.0, cuts=None, refine=3):
         t0 = time.time()
         x0, y0, x1, y1 = self.bounds
         whole = (x0, y0, x1, y1)
@@ -605,17 +605,10 @@ class Solver:
                         if strict < 2 or q is not None:
                             consider([(whole, axis, q, align, strict)])
         self.log(f"[{time.time() - t0:6.1f}s] whole hall, one direction: best {best()}")
-        # B. two zones split by a line; rank each zone's (axis, spine, strict) alone, then combine the best few
-        pts = self.room.json["room"]["polygon"]
-        cuts = [("x", float(c)) for c in sorted({p[0] for p in pts})[1:-1]] + [("y", float(c)) for c in sorted({p[1] for p in pts})[1:-1]]
-        rest = [("x", float(c)) for c in np.arange(x0 + 2400, x1 - 2400 + 1, cut_step)]
-        rest += [("y", float(c)) for c in np.arange(y0 + 2400, y1 - 2400 + 1, cut_step)]
-        self.rng.shuffle(rest)
-        cuts += [c for c in rest if c not in cuts]
-        for kind, c in cuts:
-            if time.time() - t0 > budget_s:
-                self.log("search budget used up")
-                break
+        # B. two zones split by a line; rank each zone's (axis, spine, mode) alone, then combine the best few
+        cut_best = {}
+
+        def explore_cut(kind, c, spine_step):
             zones = self.zone_pair(kind, c)
             ranked = []
             for zone in zones:
@@ -623,7 +616,7 @@ class Solver:
                 for axis in (0, 1):
                     opts = []
                     for strict in (0, 1, 2):
-                        for q in self.spine_positions(zone, axis, coarse):
+                        for q in self.spine_positions(zone, axis, spine_step):
                             if strict < 2 or q is not None:
                                 opts.append((len(self.build([(zone, axis, q, "lo", strict)])), q, strict))
                     opts.sort(key=lambda o: -o[0])
@@ -636,7 +629,26 @@ class Solver:
                     for al in ("lo", "hi"):
                         parts = [(zones[0], a0, q0, al, s0), (zones[1], a1, q1, al, s1)]
                         here = max(here, consider(parts), consider(parts[::-1]))
+            cut_best[(kind, c)] = here
             self.log(f"[{time.time() - t0:6.1f}s] split {kind}={c:.0f}: best {here}  (overall {best()})")
+
+        if cuts is None:
+            pts = self.room.json["room"]["polygon"]
+            cuts = [("x", float(c)) for c in sorted({p[0] for p in pts})[1:-1]] + [("y", float(c)) for c in sorted({p[1] for p in pts})[1:-1]]
+            rest = [("x", float(c)) for c in np.arange(x0 + 2400, x1 - 2400 + 1, cut_step)]
+            rest += [("y", float(c)) for c in np.arange(y0 + 2400, y1 - 2400 + 1, cut_step)]
+            self.rng.shuffle(rest)
+            cuts += [c for c in rest if c not in cuts]
+        for kind, c in cuts:
+            if time.time() - t0 > budget_s:
+                self.log("search budget used up")
+                break
+            explore_cut(kind, c, coarse)
+        # C. refine around the best split lines: neighbouring positions in 100 mm steps, finer spine positions
+        for kind, c in sorted(cut_best, key=lambda k: -cut_best[k])[:refine]:
+            for dc in (0, -300, -200, -100, 100, 200, 300):
+                if dc == 0 or (kind, c + dc) not in cut_best:
+                    explore_cut(kind, c + dc, 300)
         # polish the best distinct candidates
         order = sorted(pool.items(), key=lambda kv: -kv[1][0])
         results, seen = [], set()
@@ -696,6 +708,8 @@ def main():
     ap.add_argument("--budget", type=float, default=600, help="seconds for the zone-split search")
     ap.add_argument("--top", type=int, default=12, help="candidates to polish")
     ap.add_argument("--cut-step", type=int, default=600, help="spacing of the zone split lines tried (mm)")
+    ap.add_argument("--cuts", help="only these split lines, e.g. 'y=4300,x=14500' (default: all, --cut-step apart)")
+    ap.add_argument("--refine", type=int, default=3, help="number of best split lines refined in 100 mm steps")
     ap.add_argument("--lns-top", type=int, default=3, help="how many polished candidates get the large-neighbourhood search")
     ap.add_argument("--lns", type=float, default=240, help="seconds of large-neighbourhood search per candidate")
     ap.add_argument("--seed", type=int, default=0)
@@ -703,7 +717,8 @@ def main():
     a = ap.parse_args()
     room_json = json.loads(pathlib.Path(a.room).read_text())
     sv = Solver(room_json, seed=a.seed)
-    results, pool = sv.search(budget_s=a.budget, top=a.top, cut_step=a.cut_step, lns_top=a.lns_top, lns_s=a.lns)
+    cuts = [(c.split("=")[0], float(c.split("=")[1])) for c in a.cuts.split(",")] if a.cuts else None
+    results, pool = sv.search(budget_s=a.budget, top=a.top, cut_step=a.cut_step, lns_top=a.lns_top, lns_s=a.lns, cuts=cuts, refine=a.refine)
     n, cnt, desc, racks, _ = results[0]
     V = sv.check(racks)
     assert not V.any(), "reference design violates a rule"
