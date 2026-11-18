@@ -328,7 +328,7 @@ class Plan:
     def notes(self):
         d = self.d
         x, y = 40, self.H - MB + 250
-        self.text((x, y), "DATA HALL 01 - EQUIPMENT LAYOUT PLAN", sz=30, bold=True, anchor="lm")
+        self.text((x, y), self.lay.get("title", "DATA HALL 01 - EQUIPMENT LAYOUT PLAN"), sz=30, bold=True, anchor="lm")
         lines = [
             "1. ALL DIMENSIONS IN mm. GRID LINES ARE ON WALL / COLUMN CENTRELINES.",
             "2. WALLS 200 THK. COLUMNS 600 x 600.",

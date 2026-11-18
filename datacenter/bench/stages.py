@@ -61,7 +61,28 @@ def check_s2(run: pathlib.Path, scene) -> list[str]:
     return probs
 
 
+def check_s1p(run: pathlib.Path) -> list[str]:
+    p = run / "layout_pred.json"
+    if not p.exists():
+        return ["layout_pred.json missing in the run directory"]
+    try:
+        d = json.loads(p.read_text())
+    except Exception as e:
+        return [f"layout_pred.json is not valid JSON: {e}"]
+    probs = []
+    for key in ("racks", "crah", "aisles"):
+        if not isinstance(d.get(key), list):
+            probs.append(f"{key} must be a list")
+    for i, r in enumerate(d.get("racks") or []):
+        if not _num_pair(r.get("center")) or not _num_pair(r.get("size")) or r.get("facing") not in FACINGS:
+            probs.append(f"racks[{i}] needs center [x,y], size [w,d], facing N/S/E/W")
+            break
+    return probs
+
+
 def check_submission(stage: str, run: pathlib.Path, scene=None) -> list[str]:
+    if stage == "s1p":
+        return check_s1p(run)
     if stage == "s1":
         return check_s1(run)
     if stage == "s2":
