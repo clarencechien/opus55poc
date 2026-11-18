@@ -1,0 +1,69 @@
+{
+ "stage": "s1p",
+ "total": 96.14,
+ "parts": {
+  "rack_count": 14.75,
+  "rack_position": 23.85,
+  "rack_facing": 14.51,
+  "rack_width": 13.03,
+  "crah": 10.0,
+  "cold_aisles": 20.0
+ },
+ "detail": {
+  "racks_gt": 61,
+  "racks_pred": 59,
+  "racks_matched": 59,
+  "median_err_mm": 0,
+  "p90_err_mm": 100,
+  "facing_acc": 0.967,
+  "width_acc": 0.869,
+  "per_row": {
+   "A": {
+    "racks": 12,
+    "matched": 12,
+    "facing_ok": 12,
+    "median_err_mm": 0
+   },
+   "B": {
+    "racks": 11,
+    "matched": 11,
+    "facing_ok": 11,
+    "median_err_mm": 0
+   },
+   "C": {
+    "racks": 12,
+    "matched": 10,
+    "facing_ok": 10,
+    "median_err_mm": 100
+   },
+   "D": {
+    "racks": 14,
+    "matched": 14,
+    "facing_ok": 14,
+    "median_err_mm": 0
+   },
+   "E": {
+    "racks": 6,
+    "matched": 6,
+    "facing_ok": 6,
+    "median_err_mm": 0
+   },
+   "F": {
+    "racks": 6,
+    "matched": 6,
+    "facing_ok": 6,
+    "median_err_mm": 0
+   }
+  },
+  "crah": {
+   "gt": 3,
+   "pred": 3,
+   "matched": 3
+  },
+  "cold_aisle_iou": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ }
+}

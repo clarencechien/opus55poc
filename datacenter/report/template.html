@@ -131,10 +131,13 @@ const MC = { "opus": "var(--c-opus)", "qwen-high": "var(--c-qh)", "qwen-default"
 const PART_NAMES = {
   racks: "機櫃", room: "房間", columns: "柱子", crah: "CRAH", doors: "門", aisles: "冷熱通道", shell: "Blender 殼體",
   position: "位置", facing: "朝向", height: "高度", ids: "ID 命名", collisions: "無碰撞", containment: "冷通道封閉",
-  perf_tiles: "有孔地磚", cable_trays: "線槽", dims_A: "Rack A 尺寸", dims_B: "Rack B 尺寸", placement: "擺放", structure: "命名結構", budget: "面數上限"
+  perf_tiles: "有孔地磚", cable_trays: "線槽", dims_A: "Rack A 尺寸", dims_B: "Rack B 尺寸", placement: "擺放", structure: "命名結構", budget: "面數上限",
+  rack_count: "機櫃數量", rack_position: "機櫃位置", rack_facing: "機櫃朝向", rack_width: "機櫃寬度", cold_aisles: "冷通道"
 };
 const PART_MAX = { racks: 50, room: 10, columns: 5, crah: 5, doors: 5, aisles: 10, shell: 15, position: 25, facing: 20, height: 5, ids: 5,
-  collisions: 10, containment: 15, perf_tiles: 10, cable_trays: 10, dims_A: 10, dims_B: 10, placement: 5, structure: 10, budget: 5 };
+  collisions: 10, containment: 15, perf_tiles: 10, cable_trays: 10, dims_A: 10, dims_B: 10, placement: 5, structure: 10, budget: 5,
+  rack_count: 15, rack_position: 25, rack_facing: 15, rack_width: 15 };
+const PART_MAX_BY_STAGE = { s1p: { crah: 10, cold_aisles: 20 } };
 let blind = false;
 try { blind = sessionStorage.getItem("blind") === "1"; } catch (e) {}
 const BLIND_NAMES = ["作品 甲", "作品 乙", "作品 丙"];
@@ -163,17 +166,17 @@ function runCard(sec, r, i) {
   const sc = scoreOf(r);
   const parts = r.score && r.score.parts ? Object.entries(r.score.parts) : [];
   const kpis = blind
-    ? `<div class="kpis"><div class="kpi"><span class="v big">${sc ? sc.v : "—"}</span><span class="k">自動分 / ${sc ? sc.max : ""}</span></div></div>`
+    ? `<div class="kpis"><div class="kpi"><span class="v big">${sc ? sc.v : "—"}</span><span class="k">${sec.stage === "s2" ? "幾何分（不含外觀）" : "自動分"} / ${sc ? sc.max : ""}</span></div></div>`
     : `<div class="kpis">
-        <div class="kpi"><span class="v big">${sc ? sc.v : "—"}</span><span class="k">自動分 / ${sc ? sc.max : ""}</span></div>
+        <div class="kpi"><span class="v big">${sc ? sc.v : "—"}</span><span class="k">${sec.stage === "s2" ? "幾何分（不含外觀）" : "自動分"} / ${sc ? sc.max : ""}</span></div>
         <div class="kpi"><span class="v">${fmtSec(r.seconds)}</span><span class="k">用時</span></div>
         <div class="kpi"><span class="v">${r.bench_calls ?? "—"}</span><span class="k">計次 bench 呼叫</span></div>
         <div class="kpi"><span class="v">${fmtCost(r.cost)}</span><span class="k">花費 · ${fmtTok(r.tokens)} tok</span></div></div>`;
   const partsHtml = parts.length ? `<div class="parts">${parts.map(([k, v]) => {
-      const mx = PART_MAX[k] || 1, pct = Math.max(0, Math.min(100, v / mx * 100));
+      const mx = (PART_MAX_BY_STAGE[sec.stage] || {})[k] || PART_MAX[k] || 1, pct = Math.max(0, Math.min(100, v / mx * 100));
       return `<span>${esc(PART_NAMES[k] || k)}</span><span class="bar"><i class="${pct < 99.5 ? "low" : ""}" style="width:${pct}%"></i></span><span class="pv">${v}/${mx}</span>`; }).join("")}</div>` : "";
   const review = r.review && r.review.length ? `<div class="block"><span class="lbl">固定視角評審圖（兩邊同一組相機）</span>
-      <div class="thumbs ${sec.stage === "s1" ? "" : ""}">${r.review.map((im, k) => fig(im, sec.stage === "s1" && k === 0 ? "span2" : "")).join("")}</div></div>` : "";
+      <div class="thumbs ${sec.stage === "s1" ? "" : ""}">${r.review.map((im, k) => fig(im, (sec.stage === "s1" || sec.stage === "s1p") && k === 0 ? "span2" : "")).join("")}</div></div>` : "";
   const execs = (r.steps || []).filter(s => s.kind === "exec");
   const steps = blind ? "" : `<div class="block"><span class="lbl">模型自己的過程：${(r.steps || []).length} 個 bench 動作，其中 ${execs.length} 次 exec</span>
       <details><summary>全部步驟順序</summary><div class="in steps">${(r.steps || []).map((s, k) => s.kind === "exec"
@@ -183,9 +186,10 @@ function runCard(sec, r, i) {
         <div class="in"><pre>${esc(s.code)}</pre>${s.out ? `<span class="lbl muted">stdout</span><pre>${esc(s.out)}</pre>` : ""}${s.err ? `<span class="lbl muted">stderr</span><pre>${esc(s.err)}</pre>` : ""}</div></details>`).join("")}</div>`;
   const own = !blind && r.own_renders && r.own_renders.length ? `<div class="block"><details><summary>模型自己做的預覽渲染（共 ${r.own_render_total} 張，顯示 ${r.own_renders.length} 張）</summary>
       <div class="in"><div class="thumbs small">${r.own_renders.map(im => fig({ src: im.src, cap: im.name })).join("")}</div></div></details></div>` : "";
+  const st = !blind && r.structure ? `<div class="block"><details><summary>場景結構統計（依物件名稱統計，僅供參考）</summary><div class="in"><pre>${esc(r.structure)}</pre></div></details></div>` : "";
   const lp = !blind && r.layout_pred ? `<div class="block"><details><summary>layout_pred.json（模型的讀圖結果）</summary><div class="in"><pre>${esc(r.layout_pred)}</pre></div></details></div>` : "";
   const path = blind ? "" : `<div class="block"><span class="path">${esc(r.path)} · ${esc((r.files || []).join(", "))}</span></div>`;
-  return `<article class="run" style="--mc:${color}"><div class="run-head"><div class="run-name"><h3>${esc(name)}</h3>${blind ? "" : `<span class="note">${esc(m.note)}</span>`}</div>${kpis}${blind ? "" : partsHtml}</div>${review}${steps}${own}${lp}${path}</article>`;
+  return `<article class="run" style="--mc:${color}"><div class="run-head"><div class="run-name"><h3>${esc(name)}</h3>${blind ? "" : `<span class="note">${esc(m.note)}</span>`}</div>${kpis}${blind ? "" : partsHtml}</div>${review}${steps}${own}${st}${lp}${path}</article>`;
 }
 
 function overview() {
@@ -194,9 +198,9 @@ function overview() {
     const cells = cols.map(mk => { const r = sec.runs.find(x => x.model === mk); if (!r) return `<td class="muted">—</td>`;
       const sc = scoreOf(r);
       return `<td class="num"><b>${sc ? sc.v : "—"}</b><span class="muted">/${sc ? sc.max : ""}</span><br><span class="muted">${fmtSec(r.seconds)} · ${r.bench_calls ?? "—"} 次 · ${fmtCost(r.cost)}</span></td>`; }).join("");
-    return `<tr><td><a href="#${sec.id}">${esc(sec.title)}</a></td>${cells}</tr>`; }).join("");
+    return `<tr><td><a href="#${sec.id}">${esc(sec.title)}</a>${sec.stage === "s2" ? `<br><span class="muted">分數只量幾何，不含外觀</span>` : ""}</td>${cells}</tr>`; }).join("");
   return `<div class="tbl-wrap"><table><thead><tr><th>階段</th>${cols.map(mk => `<th class="num"><span class="swatch" style="--mc:${MC[mk]}"></span>${esc(D.models[mk].label)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="muted" style="font-size:13px">分數是自動計分（S1、S3 滿分 100；S2 只量尺寸、擺放、命名與面數，滿分 40，外觀另看 Gemini 和人工）。時間幾乎全是等模型回應，Blender 在 CPU 上每個 run 只算幾秒。</p>`;
+    <p class="muted" style="font-size:13px">分數是自動計分（S1、S3、S1P 滿分 100）。S2 的 40 分只量外框尺寸、擺放、命名與面數，<b>完全不評外觀</b>，兩邊都滿分不代表做得像；外觀請看 Cycles 評審圖、Gemini 4 評審與人工盲測。時間幾乎全是等模型回應，Blender 在 CPU 上每個 run 只算幾秒。</p>`;
 }
 
 function judgeSection() {
@@ -206,13 +210,29 @@ function judgeSection() {
     const flags = Object.entries(j.absolute).flatMap(([n, rows]) => (rows[0]?.flags || []).map(f => `<li><b>${esc(n)}</b>：${esc(f)}</li>`)).join("");
     return `<div class="jcard"><div><span class="eyebrow">${esc(j.stage)}</span><h3>${esc(j.judge)}</h3><span class="path">${esc(j.dir)} · 約 $${j.cost}</span></div>
       <div class="tbl-wrap"><table><thead><tr><th>作品</th><th class="num">逐項換算分（各次）</th><th class="num">它自己給的總分</th></tr></thead><tbody>${abs}</tbody></table></div>
-      <div>${pw}</div><div class="reason">${esc(j.reason)}</div>${flags ? `<ul>${flags}</ul>` : ""}</div>`; }).join("");
+      <div>${pw}</div>${j.pairs && j.pairs.length ? `<ul>${j.pairs.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${j.reason ? `<div class="reason">${esc(j.reason)}</div>` : ""}${flags ? `<ul>${flags}</ul>` : ""}</div>`; }).join("");
   const ver = D.verify.map(v => `<tr><td>${esc(v.stage)}</td><td>${esc(v.claim)}</td><td>${esc(v.check)}</td></tr>`).join("");
   return `<section class="stage" id="judge"><div class="stage-head"><span class="eyebrow">第二評分</span><h2>Gemini 評審與查證</h2>
       <p class="muted">兩份作品匿名成 X／Y、隨機排序後交給 Gemini，它看不到答案卷和自動分數。下面的作品名稱是事後揭曉的。</p></div>
     <div class="callout">單獨評分可以參考；兩兩比較不可靠：它的四個具體指控經場景檔查證都是錯的，S2 的勝負還會隨對手翻轉。</div>
     <div class="tbl-wrap"><table><thead><tr><th>階段</th><th>Gemini 的說法</th><th>用場景檔查證的結果</th></tr></thead><tbody>${ver}</tbody></table></div>
     <div class="judges">${cards}</div></section>`;
+}
+
+function codeSection() {
+  if (!D.code || !D.code.length) return "";
+  const dims = ["spec_compliance", "derives_from_inputs", "self_verification", "code_quality", "efficiency"];
+  const dn = { spec_compliance: "符合規格", derives_from_inputs: "從輸入推導", self_verification: "自我檢查", code_quality: "程式品質", efficiency: "效率" };
+  const blocks = D.code.map(c => `<div class="jcard"><div><span class="eyebrow">${esc(c.stage)}</span><h3>程式碼審查 · ${esc(c.model)}</h3><span class="path">${esc(c.dir)} · 約 $${c.cost}</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>作品</th>${dims.map(d => `<th class="num">${dn[d]}</th>`).join("")}<th class="num">bug 數</th></tr></thead><tbody>
+    ${c.reviews.map(r => `<tr><td>${esc(r.name)}</td>${dims.map(d => `<td class="num">${r.scores[d]}</td>`).join("")}<td class="num">${r.bugs.length}</td></tr>`).join("")}</tbody></table></div>
+    ${c.pairs.length ? `<ul>${c.pairs.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${c.reviews.map(r => `<details><summary>${esc(r.name)}：摘要、優點與 bug</summary><div class="in"><p style="font-size:13px">${esc(r.summary)}</p>
+      ${r.strengths.length ? `<ul>${r.strengths.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+      ${r.bugs.length ? `<ul>${r.bugs.map(b => `<li><span class="pill ${b.severity === "high" ? "err" : ""}">${esc(b.severity)}</span> ${esc(b.where)}：${esc(b.what)}</li>`).join("")}</ul>` : ""}</div></details>`).join("")}</div>`).join("");
+  return `<section class="stage" id="code"><div class="stage-head"><span class="eyebrow">第二評分</span><h2>程式碼審查（Gemini 4 Carbon）</h2>
+    <p class="muted">審查者只看到任務說明和每個作品依序執行的 Blender 腳本（含成功與否、輸出摘錄），作品匿名、順序隨機。分數 1–5。</p></div>
+    <div class="judges">${blocks}</div></section>`;
 }
 
 function methodSection() {
@@ -227,7 +247,7 @@ function methodSection() {
 
 function render() {
   const rail = [`<a href="#top">總覽</a>`, `<span class="grp">階段</span>`, ...D.sections.map(s => `<a href="#${s.id}">${esc(s.title)}</a>`),
-    `<span class="grp">評分</span>`, `<a href="#judge">Gemini 評審與查證</a>`, `<a href="#method">規則與公平性</a>`];
+    `<span class="grp">評分</span>`, `<a href="#judge">Gemini 評審與查證</a>`, `<a href="#code">程式碼審查</a>`, `<a href="#method">規則與公平性</a>`];
   document.getElementById("rail").innerHTML = rail.join("");
   const head = `<header class="top" id="top"><span class="eyebrow">AI 機房 pipeline · Blender 控制 · 2026-11-18</span><h1>機房建模基準 Pilot：Opus 5.5 對 Qwen 3.8 Flash</h1>
     <p class="muted">每一階段都可以並排看兩個模型的作品：固定視角評審圖、模型自己寫的每一支 Blender 腳本與輸出、它自己做的預覽圖、讀圖結果，以及自動計分的細項。點圖片可放大。</p>
@@ -240,7 +260,7 @@ function render() {
     return `<section class="stage" id="${sec.id}"><div class="stage-head"><span class="eyebrow">${esc(sec.stage.toUpperCase())} · ${esc(sec.scenario)}</span><h2>${esc(sec.title)}</h2></div>
       <div class="inputs">${sec.inputs.filter(x => x.src).map(x => fig(x)).join("")}</div>
       <div class="runs">${idx.map((ri, k) => runCard(sec, sec.runs[ri], k)).join("")}</div></section>`; }).join("");
-  document.getElementById("main").innerHTML = head + ov + secs + (blind ? "" : judgeSection() + methodSection());
+  document.getElementById("main").innerHTML = head + ov + secs + (blind ? "" : judgeSection() + codeSection() + methodSection());
   document.getElementById("blindbtn").addEventListener("click", () => {
     blind = !blind; try { sessionStorage.setItem("blind", blind ? "1" : "0"); } catch (e) {}
     if (blind) for (const k in order) delete order[k];

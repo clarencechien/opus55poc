@@ -1,0 +1,90 @@
+{
+ "RackA": {
+  "objects": 272,
+  "mesh_objects": 271,
+  "triangles": 14172,
+  "name_keyword_counts": {
+   "server": 114,
+   "blank": 7,
+   "led": 95,
+   "rail": 12,
+   "door": 6,
+   "panel": 7,
+   "side": 2,
+   "top": 10,
+   "cable": 5,
+   "pdu": 3,
+   "tray": 1,
+   "handle": 2
+  },
+  "part_heights": {
+   "equipment": {
+    "1U": 25,
+    "0U": 16,
+    "2U": 10,
+    "4U": 6
+   },
+   "blank": {
+    "1U": 7
+   }
+  },
+  "materials": [
+   "M_Bezel",
+   "M_Blank",
+   "M_Brush",
+   "M_CblBlack",
+   "M_CblBlue",
+   "M_CblGrey",
+   "M_Door",
+   "M_Frame",
+   "M_LED_A",
+   "M_LED_B",
+   "M_LED_G",
+   "M_MetalG",
+   "M_Panel",
+   "M_Rail",
+   "M_Server"
+  ]
+ },
+ "RackB": {
+  "objects": 112,
+  "mesh_objects": 111,
+  "triangles": 17912,
+  "name_keyword_counts": {
+   "blank": 5,
+   "led": 6,
+   "top": 4,
+   "cable": 8,
+   "patch": 24,
+   "post": 16,
+   "switch": 5,
+   "pdu": 2
+  },
+  "part_heights": {
+   "equipment": {
+    "2U": 4,
+    "4U": 2,
+    "8U": 5
+   },
+   "blank": {
+    "1U": 5
+   }
+  },
+  "materials": [
+   "M_Bezel",
+   "M_Blank",
+   "M_CblBlack",
+   "M_CblBlue",
+   "M_CblCyan",
+   "M_CblGrey",
+   "M_Frame",
+   "M_LED_B",
+   "M_LED_G",
+   "M_MetalG",
+   "M_Panel",
+   "M_Port",
+   "M_Rail",
+   "M_Server"
+  ]
+ }
+}

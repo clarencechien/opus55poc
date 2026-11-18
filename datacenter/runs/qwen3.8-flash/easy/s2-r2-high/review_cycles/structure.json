@@ -1,0 +1,67 @@
+{
+ "RackA": {
+  "objects": 33,
+  "mesh_objects": 32,
+  "triangles": 9584,
+  "name_keyword_counts": {
+   "server": 24,
+   "rail": 1,
+   "door": 2,
+   "panel": 2,
+   "side": 1,
+   "top": 1
+  },
+  "part_heights": {
+   "equipment": {
+    "4U": 4,
+    "1U": 14,
+    "2U": 6
+   }
+  },
+  "materials": [
+   "Bezel.004",
+   "BlankBlack.004",
+   "DoorBlack.004",
+   "LedAmber.004",
+   "LedBlue.004",
+   "LedGreen.004",
+   "PanelBlack.004",
+   "RackBlack.004",
+   "RailGray.004",
+   "ServerBlack.004"
+  ]
+ },
+ "RackB": {
+  "objects": 21,
+  "mesh_objects": 20,
+  "triangles": 9876,
+  "name_keyword_counts": {
+   "rail": 1,
+   "top": 1,
+   "cable": 2,
+   "post": 4,
+   "tray": 1
+  },
+  "part_heights": {
+   "equipment": {
+    "1U": 6,
+    "2U": 3,
+    "4U": 1
+   }
+  },
+  "materials": [
+   "Bezel.004",
+   "BlankBlack.004",
+   "CableBlack.004",
+   "CableBlue.004",
+   "CableLtBlue.004",
+   "LedBlue.004",
+   "LedGreen.004",
+   "MgrGray.004",
+   "PortSilver.004",
+   "RackBlack.004",
+   "RailGray.004",
+   "ServerBlack.004"
+  ]
+ }
+}

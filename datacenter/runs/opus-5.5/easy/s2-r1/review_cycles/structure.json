@@ -1,0 +1,93 @@
+{
+ "RackA": {
+  "objects": 40,
+  "mesh_objects": 38,
+  "triangles": 19608,
+  "name_keyword_counts": {
+   "server": 18,
+   "blank": 6,
+   "rail": 1,
+   "door": 2,
+   "panel": 4,
+   "side": 2,
+   "top": 1,
+   "patch": 1,
+   "switch": 1,
+   "pdu": 2
+  },
+  "part_heights": {
+   "equipment": {
+    "4U": 3,
+    "2U": 5,
+    "1U": 11
+   },
+   "blank": {
+    "1U": 4,
+    "2U": 2
+   }
+  },
+  "materials": [
+   "blanking_panel",
+   "cab_black",
+   "cab_panel",
+   "cable_black",
+   "cable_blue",
+   "cable_grey",
+   "door_perforated",
+   "drive_bay",
+   "hole_black",
+   "label_white",
+   "led_amber",
+   "led_blue",
+   "led_green",
+   "lock_red",
+   "outlet",
+   "rail_zinc",
+   "rubber",
+   "server_body",
+   "server_face",
+   "silver"
+  ]
+ },
+ "RackB": {
+  "objects": 31,
+  "mesh_objects": 29,
+  "triangles": 9616,
+  "name_keyword_counts": {
+   "panel": 7,
+   "top": 1,
+   "cable": 10,
+   "patch": 7,
+   "post": 4,
+   "switch": 2,
+   "manager": 7,
+   "tray": 3
+  },
+  "part_heights": {
+   "equipment": {
+    "2U": 1,
+    "1U": 1
+   }
+  },
+  "materials": [
+   "cab_black",
+   "cable_aqua",
+   "cable_black",
+   "cable_blue",
+   "cable_grey",
+   "cable_salmon",
+   "drive_bay",
+   "hole_black",
+   "label_white",
+   "led_blue",
+   "led_green",
+   "port_lightblue",
+   "rail_zinc",
+   "server_body",
+   "server_face",
+   "silver",
+   "tray_silver",
+   "window_glass"
+  ]
+ }
+}

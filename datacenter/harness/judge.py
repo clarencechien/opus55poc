@@ -24,7 +24,7 @@ import requests
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 # rough cost estimate per 1M tokens (input, output incl. thinking) for gemini-3.8-flash
-PRICE = {"gemini-3.8-flash": (0.825, 4.125)}
+PRICE = {"gemini-3.8-flash": (0.825, 4.125), "gemini-4-argon": (2.0, 10.0), "gemini-4-carbon": (2.0, 10.0), "gemini-4-hydrogen": (1.5, 7.5)}
 
 RUBRIC = {
     "s1": """The task given to the modeller: read the equipment layout plan (first image) and produce
@@ -59,7 +59,8 @@ servers of varied heights visible through the front door with blanking panels an
 Rack B, an open 4-post frame like the open racks on the raised floor: 600 W x 1000 D x 2000 H mm, four posts with holes or
 rails, top and bottom frame, cable management, partially populated (equipment, patch panels, cabling, open space), no doors
 or side panels. Both stand on the floor with the front facing the viewer of the 'front' render.
-You get Workbench (flat-shaded, untextured) renders: front, back, right side, isometric and a close 3/4 view of each rack.
+You get renders of each rack (Cycles renders with lighting and materials when available, including a view with the doors
+hidden so the interior is visible).
 Judge each checklist item as present / partial / absent from what the renders show, and rate how closely each rack
 resembles its reference photos (1 = not at all, 5 = convincingly the same kind of equipment), allowing for the flat
 preview shading."""
@@ -232,31 +233,28 @@ def s2_reference_parts():
 
 
 def s2_submission_parts(label, run):
-    rv = run / "review"
+    rv, cyc = run / "review", run / "review_cycles"
     parts = []
-    for rack in ("A", "B"):
-        for v in ("front", "back", "right", "iso", "close"):
-            f = rv / f"review_Rack{rack}_{v}.png"
-            if f.exists():
-                parts += [{"type": "text", "text": f"Submission {label}, rack {rack}, {v} view"}, small_img(f)]
+    if cyc.exists():
+        for rack in ("A", "B"):
+            for v, cap in (("front", "front"), ("front_open", "front with the doors hidden (interior)"), ("close", "close 3/4 view"),
+                           ("back", "back"), ("side", "side")):
+                f = cyc / f"cyc_Rack{rack}_{v}.jpg"
+                if f.exists():
+                    parts += [{"type": "text", "text": f"Submission {label}, rack {rack}, {cap} (Cycles render)"}, small_img(f)]
+        st = cyc / "structure.json"
+        if st.exists():
+            parts.append({"type": "text", "text": f"Submission {label}: scene statistics derived from object NAMES (hints only; a part may "
+                                                  f"exist under another name, so trust the images):\n{st.read_text()}"})
+    else:
+        for rack in ("A", "B"):
+            for v in ("front", "back", "right", "iso", "close"):
+                f = rv / f"review_Rack{rack}_{v}.png"
+                if f.exists():
+                    parts += [{"type": "text", "text": f"Submission {label}, rack {rack}, {v} view"}, small_img(f)]
     if not parts:
         parts = [{"type": "text", "text": f"Submission {label}: no renders (nothing was built)"}]
     return parts
-
-
-def s3_layout_parts(scenario="easy"):
-    return [{"type": "text", "text": "The layout (redrawn plan):"},
-            small_img(ROOT / "judge" / "assets" / f"{scenario}-s3_layout_plan.png", 1568)]
-
-
-def s3_submission_parts(label, run):
-    rv = run / "review"
-    parts = []
-    for v, cap in (("top", "top view"), ("iso", "isometric view"), ("coldaisle0", "inside the cold aisle"), ("overview0", "overview")):
-        f = rv / f"review_{v}.png"
-        if f.exists():
-            parts += [{"type": "text", "text": f"Submission {label}: {cap}"}, small_img(f)]
-    return parts or [{"type": "text", "text": f"Submission {label}: no renders"}]
 
 
 def call(model, messages, schema, name):
@@ -267,8 +265,13 @@ def call(model, messages, schema, name):
             "generationConfig": {"responseMimeType": "application/json", "responseJsonSchema": schema,
                                  "thinkingConfig": {"thinkingLevel": "high"}}}
     r = None
-    for attempt in range(5):
-        r = requests.post(API.format(model=model), headers={"x-goog-api-key": key}, json=body, timeout=900)
+    for attempt in range(8):
+        try:
+            r = requests.post(API.format(model=model), headers={"x-goog-api-key": key}, json=body, timeout=900)
+        except requests.RequestException as e:  # proxy / connection blips: back off and retry
+            print("network error, retrying:", type(e).__name__, flush=True)
+            time.sleep(20 * (attempt + 1))
+            continue
         if r.status_code == 200:
             d = r.json()
             try:
@@ -290,7 +293,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", default="s1")
     ap.add_argument("--scenario", default="easy")
-    ap.add_argument("--runs", nargs=2, required=True)
+    ap.add_argument("--runs", nargs="+", required=True)
+    ap.add_argument("--tag", default="", help="suffix for the output folder")
     ap.add_argument("--model", default="gemini-3.8-flash")
     ap.add_argument("--repeats", type=int, default=2)
     a = ap.parse_args()
@@ -298,14 +302,16 @@ def main():
     rng = random.SystemRandom()
     order = runs[:]
     rng.shuffle(order)
-    mapping = {"X": str(order[0]), "Y": str(order[1])}
-    outdir = ROOT / "judge" / f"{a.stage}-{a.scenario}"
+    LABELS = "XYZW"
+    mapping = {LABELS[i]: str(r) for i, r in enumerate(order)}
+    outdir = ROOT / "judge" / (f"{a.stage}-{a.scenario}" + (f"-{a.tag}" if a.tag else ""))
     outdir.mkdir(parents=True, exist_ok=True)
     plan = ROOT / "inputs" / a.scenario / "plan.png"
     sysmsg = ("You are an independent reviewer of 3D modelling submissions. You have no answer key: derive the correct "
               "answer from the inputs yourself, be strict and specific, and mark anything genuinely ambiguous in the "
               "drawing as 'ambiguous' rather than wrong.")
-    result = {"model": a.model, "api": "Gemini API (direct)", "cost_note": "estimated from token counts", "absolute": {"X": [], "Y": []}, "pairwise": None, "cost_usd": 0.0}
+    result = {"model": a.model, "api": "Gemini API (direct)", "cost_note": "estimated from token counts",
+              "absolute": {LABELS[i]: [] for i in range(len(order))}, "pairwise": None, "pairs": [], "cost_usd": 0.0}
     if a.stage == "s3":
         head = [{"type": "text", "text": RUBRIC["s3"]}] + s3_layout_parts(a.scenario)
         for label, run in (("X", order[0]), ("Y", order[1])):
@@ -326,8 +332,10 @@ def main():
         result["pairwise"] = p
         print("pairwise", p, flush=True)
     elif a.stage == "s2":
+        import itertools
         head = [{"type": "text", "text": RUBRIC["s2"]}] + s2_reference_parts()
-        for label, run in (("X", order[0]), ("Y", order[1])):
+        for i, run in enumerate(order):
+            label = LABELS[i]
             for k in range(a.repeats):
                 msgs = [{"role": "system", "content": sysmsg},
                         {"role": "user", "content": head + s2_submission_parts(label, run)
@@ -337,13 +345,16 @@ def main():
                 g["derived"] = s2_score(g)
                 result["absolute"][label].append(g)
                 print(label, k, g["derived"], flush=True)
-        msgs = [{"role": "system", "content": sysmsg},
-                {"role": "user", "content": head + s2_submission_parts("X", order[0]) + s2_submission_parts("Y", order[1])
-                 + [{"type": "text", "text": "Compare submissions X and Y: which rack A is better, which rack B, and overall?"}]}]
-        p, u = call(a.model, msgs, S2_PAIR_SCHEMA, "pairwise")
-        result["cost_usd"] += float(u.get("cost") or 0)
-        result["pairwise"] = p
-        print("pairwise", p, flush=True)
+        for i, j in itertools.combinations(range(len(order)), 2):
+            x, y = (i, j) if rng.random() < 0.5 else (j, i)
+            msgs = [{"role": "system", "content": sysmsg},
+                    {"role": "user", "content": head + s2_submission_parts("X", order[x]) + s2_submission_parts("Y", order[y])
+                     + [{"type": "text", "text": "Compare submissions X and Y: which rack A is better, which rack B, and overall?"}]}]
+            p, u = call(a.model, msgs, S2_PAIR_SCHEMA, "pairwise")
+            result["cost_usd"] += float(u.get("cost") or 0)
+            p["X_is"], p["Y_is"] = LABELS[x], LABELS[y]
+            result["pairs"].append(p)
+            print("pair", LABELS[x], "vs", LABELS[y], {k: p[k] for k in ("better_rack_A", "better_rack_B", "better_overall", "confidence")}, flush=True)
     else:
         for label, run in (("X", order[0]), ("Y", order[1])):
             for k in range(a.repeats):
