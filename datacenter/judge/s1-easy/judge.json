@@ -1,0 +1,414 @@
+{
+ "model": "gemini-3.8-flash",
+ "api": "Gemini API (direct)",
+ "cost_note": "estimated from token counts",
+ "absolute": {
+  "X": [
+   {
+    "checks": [
+     {
+      "category": "racks",
+      "item": "rack count",
+      "verdict": "correct",
+      "note": "All 16 racks accounted for across both rows."
+     },
+     {
+      "category": "racks",
+      "item": "rack positions",
+      "verdict": "correct",
+      "note": "Centres match plan dimension chains along both axes."
+     },
+     {
+      "category": "racks",
+      "item": "rack facing",
+      "verdict": "correct",
+      "note": "Row A faces North and Row B faces South."
+     },
+     {
+      "category": "racks",
+      "item": "rack ids",
+      "verdict": "correct",
+      "note": "IDs A01-A08 and B01-B08 mapped accurately."
+     },
+     {
+      "category": "racks",
+      "item": "rack sizes",
+      "verdict": "correct",
+      "note": "Dimensions set correctly to 600 mm by 1200 mm."
+     },
+     {
+      "category": "room",
+      "item": "inner polygon",
+      "verdict": "correct",
+      "note": "Coordinates match inside face of 200 mm perimeter walls."
+     },
+     {
+      "category": "room",
+      "item": "heights and thickness",
+      "verdict": "correct",
+      "note": "Wall thickness, clear height, and floor height match notes."
+     },
+     {
+      "category": "columns",
+      "item": "column layout",
+      "verdict": "correct",
+      "note": "B/2 and C/2 columns correctly placed and sized."
+     },
+     {
+      "category": "crah",
+      "item": "crah placement and facing",
+      "verdict": "correct",
+      "note": "Units correctly positioned at west wall facing East."
+     },
+     {
+      "category": "doors",
+      "item": "door D1",
+      "verdict": "correct",
+      "note": "Centred on east grid line at y=9000 with 1800 mm width."
+     },
+     {
+      "category": "aisles",
+      "item": "cold aisle extents",
+      "verdict": "correct",
+      "note": "Cold aisle correctly spans between opposing rack faces."
+     },
+     {
+      "category": "aisles",
+      "item": "hot aisle extents",
+      "verdict": "ambiguous",
+      "note": "North hot aisle stops at grid 2 rather than a wall face."
+     },
+     {
+      "category": "shell",
+      "item": "walls and door opening",
+      "verdict": "correct",
+      "note": "Perimeter geometry and door opening match layout."
+     },
+     {
+      "category": "shell",
+      "item": "raised floor and columns",
+      "verdict": "correct",
+      "note": "Floor elevation and columns modelled cleanly without equipment."
+     }
+    ],
+    "category_scores": {
+     "racks": 36,
+     "room": 7,
+     "columns": 4,
+     "crah": 4,
+     "doors": 4,
+     "aisles": 6,
+     "shell": 11
+    },
+    "total": 72,
+    "summary": "High-fidelity extraction of plan geometry, equipment placement, and 3D shell construction, with minor ambiguity in northern hot aisle bounds.",
+    "derived": {
+     "racks": 50.0,
+     "room": 10.0,
+     "columns": 5.0,
+     "crah": 5.0,
+     "doors": 5.0,
+     "aisles": 10.0,
+     "shell": 15.0,
+     "total": 100.0
+    }
+   },
+   {
+    "checks": [
+     {
+      "category": "racks",
+      "item": "rack count and ids",
+      "verdict": "correct",
+      "note": "16 racks present, labelled A01-A08 and B01-B08."
+     },
+     {
+      "category": "racks",
+      "item": "rack dimensions",
+      "verdict": "correct",
+      "note": "All rack sizes correctly set to 600 mm x 1200 mm."
+     },
+     {
+      "category": "racks",
+      "item": "rack positions",
+      "verdict": "correct",
+      "note": "Row A and B coordinates match dimension chains."
+     },
+     {
+      "category": "racks",
+      "item": "rack facing",
+      "verdict": "correct",
+      "note": "Row A faces north and Row B faces south toward the cold aisle."
+     },
+     {
+      "category": "room",
+      "item": "inner polygon and wall thickness",
+      "verdict": "correct",
+      "note": "Polygon reflects 200 mm offset from grid-centered walls."
+     },
+     {
+      "category": "room",
+      "item": "heights",
+      "verdict": "correct",
+      "note": "Clear height (3000 mm) and raised floor (600 mm) match notes."
+     },
+     {
+      "category": "columns",
+      "item": "placement and size",
+      "verdict": "correct",
+      "note": "Columns B/2 and C/2 match 600 mm x 600 mm grid intersections."
+     },
+     {
+      "category": "crah",
+      "item": "position, size, facing",
+      "verdict": "correct",
+      "note": "Both units correctly placed along west wall facing east."
+     },
+     {
+      "category": "doors",
+      "item": "D1 position and width",
+      "verdict": "correct",
+      "note": "East wall placement at y=9000 with 1800 mm width matches plan."
+     },
+     {
+      "category": "aisles",
+      "item": "extents and containment types",
+      "verdict": "correct",
+      "note": "Cold aisle and hot aisle extents accurately defined."
+     },
+     {
+      "category": "shell",
+      "item": "geometry and heights",
+      "verdict": "correct",
+      "note": "Walls, door opening, raised floor, and columns properly modelled in metres."
+     },
+     {
+      "category": "shell",
+      "item": "equipment exclusion",
+      "verdict": "correct",
+      "note": "Racks and CRAH units omitted from Blender shell as specified."
+     }
+    ],
+    "category_scores": {
+     "racks": 37.0,
+     "room": 7.0,
+     "columns": 3.5,
+     "crah": 3.5,
+     "doors": 3.5,
+     "aisles": 7.0,
+     "shell": 10.5
+    },
+    "total": 72.0,
+    "summary": "Submission matches the drawing dimensions, grid layout, equipment specifications, and shell modelling requirements.",
+    "derived": {
+     "racks": 50.0,
+     "room": 10.0,
+     "columns": 5.0,
+     "crah": 5.0,
+     "doors": 5.0,
+     "aisles": 10.0,
+     "shell": 15.0,
+     "total": 100.0
+    }
+   }
+  ],
+  "Y": [
+   {
+    "checks": [
+     {
+      "category": "room",
+      "item": "inner_polygon",
+      "verdict": "correct",
+      "note": "Matches 200 mm walls offset from grid lines."
+     },
+     {
+      "category": "room",
+      "item": "wall_thickness_and_heights",
+      "verdict": "correct",
+      "note": "200 mm walls, 3000 mm clear height, 600 mm floor."
+     },
+     {
+      "category": "columns",
+      "item": "column_positions_and_sizes",
+      "verdict": "correct",
+      "note": "Both columns 600x600 centered on B/2 and C/2."
+     },
+     {
+      "category": "doors",
+      "item": "door_D1",
+      "verdict": "correct",
+      "note": "Centered at [14400, 9000] with width 1800 mm."
+     },
+     {
+      "category": "crah",
+      "item": "crah_units",
+      "verdict": "correct",
+      "note": "Positions, 1800x900 sizes, and east-facing air intakes match."
+     },
+     {
+      "category": "racks",
+      "item": "rack_counts_and_ids",
+      "verdict": "correct",
+      "note": "All 16 racks (A01-A08, B01-B08) properly identified."
+     },
+     {
+      "category": "racks",
+      "item": "rack_dimensions_and_positions",
+      "verdict": "correct",
+      "note": "600x1200 mm sizes and row spacing align with drawing."
+     },
+     {
+      "category": "racks",
+      "item": "rack_facing",
+      "verdict": "correct",
+      "note": "Row A faces North and Row B faces South toward aisle."
+     },
+     {
+      "category": "aisles",
+      "item": "aisle_definitions",
+      "verdict": "correct",
+      "note": "Cold aisle and both hot aisle bounding boxes match layout."
+     },
+     {
+      "category": "shell",
+      "item": "geometry_and_elements",
+      "verdict": "correct",
+      "note": "Walls, door opening, floor, and columns properly generated without racks."
+     }
+    ],
+    "category_scores": {
+     "racks": 36.5,
+     "room": 7.0,
+     "columns": 3.5,
+     "crah": 3.5,
+     "doors": 3.5,
+     "aisles": 7.0,
+     "shell": 10.5
+    },
+    "total": 71.5,
+    "summary": "Submission matches all specified dimensions, orientations, and 3D shell requirements accurately.",
+    "derived": {
+     "racks": 50.0,
+     "room": 10.0,
+     "columns": 5.0,
+     "crah": 5.0,
+     "doors": 5.0,
+     "aisles": 10.0,
+     "shell": 15.0,
+     "total": 100.0
+    }
+   },
+   {
+    "checks": [
+     {
+      "category": "racks",
+      "item": "rack_count",
+      "verdict": "correct",
+      "note": "16 racks total arranged in two rows of 8."
+     },
+     {
+      "category": "racks",
+      "item": "rack_positions",
+      "verdict": "correct",
+      "note": "All coordinates align with dimension chains."
+     },
+     {
+      "category": "racks",
+      "item": "rack_facing",
+      "verdict": "correct",
+      "note": "Row A faces North and Row B faces South."
+     },
+     {
+      "category": "racks",
+      "item": "rack_ids",
+      "verdict": "correct",
+      "note": "IDs A01-A08 and B01-B08 match the plan."
+     },
+     {
+      "category": "racks",
+      "item": "rack_sizes",
+      "verdict": "correct",
+      "note": "Dimensions accurately set to 600x1200 mm."
+     },
+     {
+      "category": "room",
+      "item": "inner_polygon",
+      "verdict": "correct",
+      "note": "Offsets correctly derived from 200 mm walls on grid lines."
+     },
+     {
+      "category": "room",
+      "item": "heights_and_thickness",
+      "verdict": "correct",
+      "note": "Clear height, raised floor height, and wall thickness match notes."
+     },
+     {
+      "category": "columns",
+      "item": "column_geometry",
+      "verdict": "correct",
+      "note": "Grid B/2 and C/2 columns positioned at 600x600 mm size."
+     },
+     {
+      "category": "crah",
+      "item": "crah_units",
+      "verdict": "correct",
+      "note": "Position, 1800x900 mm sizing, and East facing are accurate."
+     },
+     {
+      "category": "doors",
+      "item": "door_d1",
+      "verdict": "correct",
+      "note": "Placed on East wall at y=9000 with 1800 mm width."
+     },
+     {
+      "category": "aisles",
+      "item": "aisle_definitions",
+      "verdict": "correct",
+      "note": "Cold aisle and hot aisle extents match equipment boundaries."
+     },
+     {
+      "category": "shell",
+      "item": "blender_geometry",
+      "verdict": "correct",
+      "note": "Walls, door opening, raised floor, and columns properly modelled without racks."
+     }
+    ],
+    "category_scores": {
+     "racks": 36.0,
+     "room": 7.0,
+     "columns": 3.5,
+     "crah": 3.5,
+     "doors": 3.5,
+     "aisles": 7.0,
+     "shell": 10.5
+    },
+    "total": 71.0,
+    "summary": "The submission accurately captures all architectural, equipment, and aisle definitions from the drawing with correct 3D shell execution.",
+    "derived": {
+     "racks": 50.0,
+     "room": 10.0,
+     "columns": 5.0,
+     "crah": 5.0,
+     "doors": 5.0,
+     "aisles": 10.0,
+     "shell": 15.0,
+     "total": 100.0
+    }
+   }
+  ]
+ },
+ "pairwise": {
+  "better": "Y",
+  "confidence": "high",
+  "per_category": {
+   "racks": "tie",
+   "room": "tie",
+   "columns": "tie",
+   "crah": "tie",
+   "doors": "tie",
+   "aisles": "Y",
+   "shell": "Y"
+  },
+  "reason": "Both submissions have identical and accurate data for the room geometry, grid lines, columns, CRAH units, doors, and racks. They differ in two areas:\n\n1. Aisles: The task defines aisles as rectangles 'between rack faces, or between a rack face and a wall'. For the northern hot aisle, Submission Y strictly follows this rule by extending the rectangle from the back of Row B (y=5100) to the inner face of the north wall (y=11900). Submission X stops at y=6000, which is Grid Line 2 (a column grid line, not a wall).\n\n2. Shell: In Submission X, the door opening is cut completely through from floor to the top of the wall, leaving an open full-height slot with no wall header/lintel. Submission Y correctly models a proper door opening with a wall lintel above it."
+ },
+ "cost_usd": 0.16736527499999998
+}

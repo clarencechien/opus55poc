@@ -4,7 +4,7 @@
 
 CC BY 和 CC BY-SA 須標示作者與授權。3D 機櫃是看照片重新建模，不是照片的衍生影像；照片本身如果修改後重新散布，BY-SA 須以相同授權釋出。
 
-> 目前只下載了 `rack_row_front_nersc.jpg`。其餘 5 張下載時，Wikimedia 對這個容器的 IP 一直回 429（限流），改在 M1 補抓（換時段重試，或從 Modal 容器下載）。授權與作者已經查證。
+> 已下載 4 張（寬 1920 px）。`rack_single_door_open.jpg` 和 `rack_server_bezel_detail.jpg` 下載時，Wikimedia 一直回 429（限流），還沒抓到；pilot 先用這 4 張。授權與作者都已查證。
 
 | 檔案 | 用途 | 作者 | 授權 | 來源 |
 |---|---|---|---|---|
