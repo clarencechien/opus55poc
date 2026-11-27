@@ -1,4 +1,0 @@
-[
- {"src": "inputs/photo_2.jpg", "box": [330, 380, 900, 800], "scale": 2, "out": "crops/p2_photo.png"},
- {"src": "renders/r_photo_2.png", "box": [330, 380, 900, 800], "scale": 2, "out": "crops/p2_des.png"}
-]

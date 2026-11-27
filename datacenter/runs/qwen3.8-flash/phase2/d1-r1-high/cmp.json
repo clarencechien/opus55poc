@@ -1,3 +1,0 @@
-[
- {"a": "inputs/photo_1.jpg", "b": "renders/e_1.png", "box": [100, 380, 760, 700], "scale": 2, "stack": true, "out": "cmp/p1_cd2.png"}
-]

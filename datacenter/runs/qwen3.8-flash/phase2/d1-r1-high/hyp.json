@@ -1,7 +1,0 @@
-{"cams": [3, 5, 6], "hyps": {
- "base": {},
- "A345S": {"A03": {"facing": "S"}, "A04": {"facing": "S"}, "A05": {"facing": "S"}},
- "A345S_E05N": {"A03": {"facing": "S"}, "A04": {"facing": "S"}, "A05": {"facing": "S"}, "E05": {"facing": "N"}},
- "A345S_E05del": {"A03": {"facing": "S"}, "A04": {"facing": "S"}, "A05": {"facing": "S"}, "E05": {"del": true}},
- "A345S_E05N_F05N": {"A03": {"facing": "S"}, "A04": {"facing": "S"}, "A05": {"facing": "S"}, "E05": {"facing": "N"}, "F05": {"facing": "N"}}
-}}

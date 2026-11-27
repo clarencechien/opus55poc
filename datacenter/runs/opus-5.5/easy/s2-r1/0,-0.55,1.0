@@ -1,6 +1,0 @@
-{
- "ok": false,
- "stderr": "Traceback (most recent call last):\n  File \"/home/user/opus55poc/datacenter/bench/blender_server.py\", line 137, in <module>\n    res = HANDLERS[req[\"cmd\"]](req)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/user/opus55poc/datacenter/bench/blender_server.py\", line 69, in do_render\n    return _render(req, renders_dir=RENDERS)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/user/opus55poc/datacenter/bench/render_common.py\", line 64, in do_render\n    a, b = view[4:].split(\">\")\n    ^^^^\nValueError: not enough values to unpack (expected 2, got 1)\n",
- "calls_left": 55,
- "seconds_left": 2230
-}
